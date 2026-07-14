@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shatter</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        bgPrimary: '#0a0a0a',
+                        bgCard: '#171717',
+                        bgCardHover: '#1c1c1c',
+                        borderSubtle: 'rgba(255, 255, 255, 0.05)',
+                        textPrimary: '#e2e8f0',
+                        textDim: '#94a3b8',
+                        accent: '#f97316',
+                        accentHover: '#ea580c',
+                        danger: '#ef4444',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* Pywebview drag region */
+        .pywebview-drag-region {
+            -webkit-app-region: drag;
+        }
+
+        /* Elements inside titlebar that should be clickable */
+        .no-drag {
+            -webkit-app-region: no-drag;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+            /* bgPrimary */
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            /* borderSubtle */
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #737373;
+            /* textDim */
+        }
+
+        /* Input fields allow selection */
+        input,
+        textarea,
+        .selectable {
+            user-select: text;
+        }
+
+        /* Animations */
+        .slide-over {
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(100%);
+        }
+
+        .slide-over.open {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col font-sans text-sm bg-bgPrimary text-textPrimary overflow-hidden">
+
+    <!-- TITLE BAR (Draggable) -->
+    <div
+        class="h-10 w-full flex justify-between items-center px-4 border-b border-borderSubtle pywebview-drag-region bg-bgPrimary z-50 shrink-0">
+        <div class="flex items-center gap-2 text-textDim font-semibold tracking-wide text-xs">
+            <img src="Shatter.png" alt="Shatter Icon" class="w-5 h-5 object-contain">
+            SHATTER
+        </div>
+        <div class="flex items-center gap-3 no-drag">
+            <button onclick="window.pywebview.api.minimize()"
+                class="text-textDim hover:text-textPrimary transition-colors px-2 rounded hover:bg-borderSubtle">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                </svg>
+            </button>
+            <button onclick="window.pywebview.api.toggle_maximize()"
+                class="text-textDim hover:text-textPrimary transition-colors px-2 rounded hover:bg-borderSubtle">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4z"></path>
+                </svg>
+            </button>
+            <button onclick="window.pywebview.api.close()"
+                class="text-textDim hover:text-danger transition-colors px-2 rounded hover:bg-borderSubtle">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- SIDEBAR -->
+        <div class="w-16 border-r border-borderSubtle flex flex-col items-center py-6 gap-6 shrink-0 bg-bgPrimary">
+            <!-- Nav: Dashboard -->
+            <button onclick="nav('dashboard')" id="nav-dashboard"
+                class="nav-btn p-3 rounded-xl bg-bgCard border border-borderSubtle text-accent shadow-[0_0_15px_rgba(249,115,22,0.2)] transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                    </path>
+                </svg>
+            </button>
+            <!-- Nav: Activity (Potfile) -->
+            <button onclick="nav('potfile')" id="nav-potfile"
+                class="nav-btn p-3 rounded-xl text-textDim hover:text-textPrimary transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                    </path>
+                </svg>
+            </button>
+            <!-- Nav: Settings -->
+            <button onclick="nav('settings')" id="nav-settings"
+                class="nav-btn p-3 rounded-xl text-textDim hover:text-textPrimary transition-colors mt-auto">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- MAIN CONTENT AREA -->
+        <div class="flex-1 overflow-y-auto p-8 relative" id="main-scroll-area">
+
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="max-w-4xl mx-auto space-y-6">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-200">Dashboard</h1>
+                    <p class="text-textDim mt-1">Configure your attack vector.</p>
+                </div>
+
+                <!-- BENTO GRID -->
+                <div class="grid grid-cols-12 gap-6">
+
+                    <!-- Hash Input Card -->
+                    <div
+                        class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all col-span-12 p-6 flex flex-col gap-4">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-semibold tracking-wider text-textDim uppercase">TARGET
+                                HASH</label>
+                            <div class="flex gap-2">
+                                <button onclick="extractHash()"
+                                    class="text-xs font-medium px-3 py-1.5 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-md transition-colors flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                                        </path>
+                                    </svg>
+                                    Extract from File
+                                </button>
+                                <button onclick="loadHashFile()"
+                                    class="text-xs font-medium px-3 py-1.5 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-md transition-colors flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                        </path>
+                                    </svg>
+                                    Load .txt
+                                </button>
+                            </div>
+                        </div>
+                        <input type="text" id="hash-input" placeholder="Paste hash here..."
+                            class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-4 py-3 font-mono text-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all">
+
+                        <div class="flex justify-between items-center text-sm">
+                            <div class="flex items-center gap-2 text-textDim" id="algo-label">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span>Detected Algorithm: <span class="text-slate-200 font-mono text-xs"
+                                        id="algo-name">None</span></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs text-textDim uppercase font-semibold">Mode (-m)</label>
+                                <input type="text" id="hash-mode"
+                                    class="w-20 bg-bgPrimary border border-borderSubtle rounded px-2 py-1 font-mono text-center focus:border-accent focus:outline-none"
+                                    value="0">
+                            </div>
+                        </div>
+                        <div id="hashfile-label" class="text-accent text-sm hidden"></div>
+                    </div>
+
+                    <!-- Payload Card -->
+                    <div
+                        class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all col-span-8 p-6 flex flex-col gap-4">
+                        <label class="text-xs font-semibold tracking-wider text-textDim uppercase">ATTACK
+                            PAYLOAD</label>
+
+                        <div id="payload-container" class="flex flex-col gap-4">
+                            <!-- Wordlist -->
+                            <div class="flex items-center gap-3">
+                                <button onclick="selectWordlist()"
+                                    class="shrink-0 text-sm font-medium px-4 py-2 bg-bgPrimary border border-borderSubtle hover:border-accent hover:text-accent rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                    </svg>
+                                    Wordlist
+                                </button>
+                                <span id="wordlist-path" class="text-textDim truncate text-sm font-mono">No file
+                                    selected</span>
+                            </div>
+
+                            <!-- Rules / Mask (Dynamic) -->
+                            <div id="rule-section" class="flex items-center gap-3">
+                                <button onclick="addRule()"
+                                    class="shrink-0 text-sm font-medium px-4 py-2 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    Add Rule
+                                </button>
+                                <button onclick="clearRules()"
+                                    class="shrink-0 text-textDim hover:text-danger p-2 rounded-lg hover:bg-bgPrimary transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                                <div id="rule-paths" class="text-textDim truncate text-sm flex gap-2">No rules</div>
+                            </div>
+
+                            <input type="text" id="mask-input" placeholder="Mask: ?a?a?a?a"
+                                class="hidden w-full bg-bgPrimary border border-borderSubtle rounded-lg px-4 py-2 font-mono text-sm focus:outline-none focus:border-accent">
+                        </div>
+                    </div>
+
+                    <!-- Device Card -->
+                    <div
+                        class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all col-span-4 p-6 flex flex-col gap-4">
+                        <label class="text-xs font-semibold tracking-wider text-textDim uppercase">HARDWARE</label>
+                        <select id="device-select"
+                            class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent cursor-pointer appearance-none">
+                            <option value="1">Loading devices...</option>
+                        </select>
+
+                        <div class="mt-auto">
+                            <button onclick="runBenchmark()"
+                                class="w-full text-sm font-medium py-2 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-lg transition-colors flex justify-center items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                Speed Test
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Actions Row -->
+                    <div class="col-span-12 mt-4 flex gap-4 items-center">
+                        <button id="btn-crack" onclick="startCrack()"
+                            class="flex-1 py-4 rounded-xl bg-accent hover:bg-accentHover text-bgPrimary font-bold text-xl tracking-wide shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:shadow-[0_0_30px_rgba(249,115,22,0.5)] transition-all flex justify-center items-center gap-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            CRACK
+                        </button>
+
+                        <button id="btn-restore" onclick="restoreCrack()"
+                            class="hidden flex-1 py-4 rounded-xl bg-bgCard border border-borderSubtle hover:border-textDim font-bold text-xl tracking-wide transition-all justify-center items-center gap-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                </path>
+                            </svg>
+                            RESTORE
+                        </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="col-span-12">
+                        <div class="flex justify-between text-xs text-textDim mb-2 font-mono" id="progress-text">
+                            <span>0%</span>
+                            <span>ETA: --:--:--</span>
+                        </div>
+                        <div class="w-full bg-bgPrimary rounded-full h-2 overflow-hidden border border-borderSubtle">
+                            <div id="progress-bar" class="bg-accent h-full transition-all duration-300"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Process Controls (Hidden by default) -->
+                    <div id="process-controls" class="col-span-12 hidden flex gap-4">
+                        <button onclick="stopCrack()"
+                            class="flex-1 py-3 rounded-lg bg-danger/20 text-danger border border-danger/50 hover:bg-danger/30 font-semibold transition-colors">
+                            Stop
+                        </button>
+                        <button onclick="pauseCrack()" id="btn-pause"
+                            class="flex-1 py-3 rounded-lg bg-bgCard border border-borderSubtle hover:border-textDim font-semibold transition-colors">
+                            Pause
+                        </button>
+                        <button onclick="checkpointCrack()"
+                            class="flex-1 py-3 rounded-lg bg-bgCard border border-borderSubtle hover:border-textDim font-semibold transition-colors">
+                            Save & Exit
+                        </button>
+                    </div>
+
+                    <div id="cracked-reveal" class="col-span-12 hidden">
+                        <div
+                            class="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 shadow-[0_0_40px_rgba(16,185,129,0.2)] animate-[pulse_3s_ease-in-out_infinite]">
+                            <h2 class="text-emerald-500 font-bold tracking-widest uppercase text-sm">Target Cracked
+                                Successfully</h2>
+                            <div class="select-text text-4xl font-mono text-white tracking-wider" id="cracked-password-display">
+                            </div>
+                            <button onclick="dismissReveal()"
+                                class="mt-4 text-xs text-textDim hover:text-white transition-colors uppercase tracking-widest border-b border-transparent hover:border-white pb-1">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- VIEW: POTFILE -->
+            <div id="view-potfile" class="hidden max-w-4xl mx-auto space-y-6">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-200">Activity</h1>
+                        <p class="text-textDim mt-1">Cracked hashes history.</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="refreshPotfile()"
+                            class="px-4 py-2 bg-bgCard border border-borderSubtle hover:border-textDim rounded-lg text-sm font-medium transition-colors">
+                            Refresh
+                        </button>
+                        <button onclick="clearPotfile()"
+                            class="px-4 py-2 bg-danger/20 text-danger border border-danger/50 hover:bg-danger/30 rounded-lg text-sm font-medium transition-colors">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-bgPrimary text-textDim text-xs uppercase">
+                            <tr>
+                                <th class="px-6 py-3 font-semibold w-1/2">Hash</th>
+                                <th class="px-6 py-3 font-semibold">Password</th>
+                            </tr>
+                        </thead>
+                        <tbody id="potfile-tbody" class="divide-y divide-borderSubtle font-mono text-sm">
+                            <!-- Dynamic Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="hidden max-w-4xl mx-auto space-y-6 pb-20">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-200">Settings</h1>
+                    <p class="text-textDim mt-1">Engine parameters and tool paths.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- Engine Card -->
+                    <div
+                        class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all p-6 flex flex-col gap-5">
+                        <h3 class="text-xs font-semibold tracking-wider text-textDim uppercase">ENGINE RULES</h3>
+
+                        <div>
+                            <label class="block text-xs text-textDim mb-1">Attack Mode</label>
+                            <select id="set-attack-mode"
+                                class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                                <option value="0">0 - Straight (Wordlist)</option>
+                                <option value="1">1 - Combinator</option>
+                                <option value="3">3 - Brute-force (Mask)</option>
+                                <option value="6">6 - Hybrid (Wordlist + Mask)</option>
+                                <option value="7">7 - Hybrid (Mask + Wordlist)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-textDim mb-1">Workload Profile (-w)</label>
+                            <select id="set-workload"
+                                class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                                <option value="1">1 (Low)</option>
+                                <option value="2">2 (Default)</option>
+                                <option value="3">3 (High)</option>
+                                <option value="4">4 (Nightmare)</option>
+                            </select>
+                        </div>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="set-opt-kernel"
+                                class="w-4 h-4 accent-accent bg-bgPrimary border-borderSubtle rounded">
+                            <span class="text-sm">Optimized Kernel (-O)</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="set-disable-potfile"
+                                class="w-4 h-4 accent-accent bg-bgPrimary border-borderSubtle rounded">
+                            <span class="text-sm">Disable Potfile Check</span>
+                        </label>
+                    </div>
+
+                    <!-- Limits Card -->
+                    <div
+                        class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all p-6 flex flex-col gap-5">
+                        <h3 class="text-xs font-semibold tracking-wider text-textDim uppercase">LIMITS & SESSION</h3>
+
+                        <div>
+                            <label class="block text-xs text-textDim mb-1">Session Name</label>
+                            <input type="text" id="set-session" placeholder="shatter"
+                                class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-textDim mb-1">Temp Abort (°C)</label>
+                            <input type="number" id="set-temp" value="90"
+                                class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-textDim mb-1">Skip (-s)</label>
+                                <input type="number" id="set-skip"
+                                    class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-textDim mb-1">Limit (-l)</label>
+                                <input type="number" id="set-limit"
+                                    class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Paths Card -->
+                    <div
+                        class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all col-span-2 p-6 flex flex-col gap-5">
+                        <h3 class="text-xs font-semibold tracking-wider text-textDim uppercase">TOOL PATHS</h3>
+
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-textDim">Hashcat Folder</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="set-hc-path" readonly
+                                    class="flex-1 bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm text-textDim">
+                                <button onclick="browseFolder('hc')"
+                                    class="px-4 py-2 bg-bgCard border border-borderSubtle hover:border-textDim rounded-lg text-sm font-medium transition-colors">Browse</button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-textDim">John the Ripper Folder (*2john)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="set-jtr-path" readonly
+                                    class="flex-1 bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm text-textDim">
+                                <button onclick="browseFolder('jtr')"
+                                    class="px-4 py-2 bg-bgCard border border-borderSubtle hover:border-textDim rounded-lg text-sm font-medium transition-colors">Browse</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Floating LOGS Button -->
+            <button onclick="toggleLogs()"
+                class="fixed bottom-6 right-6 p-4 rounded-full bg-bgCard border border-borderSubtle hover:border-textDim shadow-lg z-40 transition-transform hover:scale-105 group">
+                <svg class="w-6 h-6 text-textDim group-hover:text-accent transition-colors" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7">
+                    </path>
+                </svg>
+            </button>
+
+        </div>
+
+        <!-- SLIDE-OVER LOGS PANEL -->
+        <div id="logs-panel"
+            class="w-[400px] border-l border-borderSubtle bg-bgCard flex flex-col shrink-0 slide-over fixed right-0 top-10 bottom-0 z-50 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]">
+            <div class="h-14 border-b border-borderSubtle flex justify-between items-center px-4 shrink-0 bg-bgPrimary">
+                <h3 class="font-semibold text-textPrimary tracking-wide">Event Log</h3>
+                <button onclick="toggleLogs()" class="text-textDim hover:text-white transition-colors p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-hidden relative">
+                <div id="terminal"
+                    class="select-text absolute inset-0 overflow-y-auto p-4 font-mono text-xs leading-relaxed text-textDim whitespace-pre-wrap selection:bg-accent/30 selection:text-white">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Resize Handles -->
+    <div id="resize-r" class="fixed top-0 right-0 w-1.5 h-full cursor-e-resize z-[100]"></div>
+    <div id="resize-b" class="fixed bottom-0 left-0 w-full h-1.5 cursor-s-resize z-[100]"></div>
+    <div id="resize-br" class="fixed bottom-0 right-0 w-4 h-4 cursor-se-resize z-[100]"></div>
+
+    <!-- JS Logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>
