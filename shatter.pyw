@@ -7,6 +7,7 @@ import json
 import logging
 from pathlib import Path
 
+from tkinterdnd2 import TkinterDnD, DND_FILES
 import customtkinter as ctk
 
 from core.log_config import setup_logging
@@ -27,7 +28,12 @@ CONFIG_FILE = TEMP_DIR / "config.json"
 log = logging.getLogger(__name__)
 
 
-class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, ctk.CTk):
+class TkDndWrapper(ctk.CTk, TkinterDnD.DnDWrapper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.TkdndVersion = TkinterDnD._require(self)
+
+class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, TkDndWrapper):
     """Main application — assembled from mixins."""
 
     def __init__(self) -> None:
@@ -51,8 +57,8 @@ class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, ctk
         self._device_var = ctk.StringVar()
 
         self._attack_mode_var = ctk.StringVar(value="0 (Wordlist)")
-        self._workload_var = ctk.StringVar(value="2 (Default)")
-        self._opt_kernel_var = ctk.BooleanVar(value=False)
+        self._workload_var = ctk.StringVar(value="3 (High)")
+        self._opt_kernel_var = ctk.BooleanVar(value=True)
         self._session_var = ctk.StringVar(value="")
         self._temp_abort_var = ctk.StringVar(value="90")
         self._charset1_var = ctk.StringVar(value="")
@@ -80,6 +86,10 @@ class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, ctk
         if not tool_paths.hashcat_exe:
             self.after(500, self._show_setup_hint)
 
+        # Setup Drag and Drop
+        self.drop_target_register(DND_FILES)
+        self.dnd_bind('<<Drop>>', self._on_file_drop)
+
     def _early_load_tool_paths(self) -> dict:
         """Load config.json just for tool paths, configure tool_paths module."""
         config = {}
@@ -93,8 +103,8 @@ class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, ctk
         return tool_paths.configure(config)
 
     def _show_setup_hint(self) -> None:
-        self._term_append("⚠️  Hashcat bulunamadı!\n")
-        self._term_append("   General sekmesindeki 'Tool Paths' bölümünden hashcat klasörünü seçin.\n")
+        self._term_append("⚠️  Hashcat not found!\n")
+        self._term_append("   Select hashcat folder from 'Tool Paths' in the General tab.\n")
         self._tabview.set("General")
 
     # ──────────────────────────────────────────
@@ -130,12 +140,12 @@ class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, ctk
         # Auto-refresh potfile when switching to that tab
         tv.configure(command=self._on_tab_change)
 
-        # Terminal
-        ctk.CTkLabel(c, text="Terminal Output", font=("Segoe UI", 13, "bold"),
+        # Terminal / Event Log
+        ctk.CTkLabel(c, text="Event Log", font=("Segoe UI", 13, "bold"),
             text_color=COLOR_TEXT_DIM, anchor="w").grid(row=2, column=0, padx=20, sticky="sw", pady=(0, 2))
         self._terminal = ctk.CTkTextbox(c, font=FONT_TERMINAL, fg_color=COLOR_TERM_BG,
             text_color=COLOR_TERM_FG, corner_radius=10, border_width=1,
-            border_color="#30363D", height=150, state="disabled")
+            border_color="#334155", height=150, state="disabled")
         self._terminal.grid(row=3, column=0, padx=16, sticky="nsew", pady=(0, 16))
 
     # ──────────────────────────────────────────
@@ -259,8 +269,8 @@ class ShatterApp(DashboardMixin, SettingsMixin, PotfileMixin, HandlersMixin, ctk
         self._skip_var.set("")
         self._limit_var.set("")
         self._attack_mode_var.set("0 (Wordlist)")
-        self._workload_var.set("2 (Default)")
-        self._opt_kernel_var.set(False)
+        self._workload_var.set("3 (High)")
+        self._opt_kernel_var.set(True)
 
         self._on_hash_changed()
         self._wordlist_path = None

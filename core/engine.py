@@ -112,7 +112,7 @@ def _stream_process(
             text=True,
             bufsize=1,
             errors="replace",
-            creationflags=creation_flags,
+            creationflags=creation_flags | (subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0),
         )
 
         if store_proc:
@@ -240,6 +240,7 @@ def _run_quiet(cmd: list[str], cwd: str | Path, timeout: int = 15) -> subprocess
         text=True,
         timeout=timeout,
         errors="replace",
+        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
     )
 
 
@@ -283,7 +284,8 @@ def extract_hash_from_file(filepath: str) -> str:
 
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=30
+            cmd, capture_output=True, text=True, timeout=30,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
         output = result.stdout.strip()
         if not output and result.stderr.strip():

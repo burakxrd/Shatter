@@ -30,21 +30,29 @@ class DashboardMixin:
         self._hash_entry.bind("<KeyRelease>", self._on_hash_changed)
 
         ctk.CTkButton(hf, text="📎 Extract", font=("Segoe UI", 12, "bold"),
-            fg_color="#2D6A4F", hover_color="#1B4332", corner_radius=10, height=42, width=100,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER, corner_radius=10, height=42, width=100,
             command=self._on_extract_hash).grid(row=0, column=1, padx=(0, 4))
 
         ctk.CTkButton(hf, text="📋 Hash File", font=("Segoe UI", 12, "bold"),
-            fg_color="#7B2D8E", hover_color="#5A1F6A", corner_radius=10, height=42, width=110,
+            fg_color="#334155", hover_color="#475569", corner_radius=10, height=42, width=110,
             command=self._on_load_hash_file).grid(row=0, column=2)
         row += 1
 
-        # ── Algo Detection + Hash File indicator ──
-        self._algo_label = ctk.CTkLabel(parent, text="Detected Algorithm:  None",
+        # ── Algo Detection + Hash Mode Override ──
+        af = ctk.CTkFrame(parent, fg_color="transparent")
+        af.grid(row=row, column=0, padx=16, sticky="ew", pady=(2, 0))
+        af.grid_columnconfigure(0, weight=1)
+
+        self._algo_label = ctk.CTkLabel(af, text="Detected Algorithm:  None",
             font=FONT_PATH, text_color=COLOR_TEXT_DIM, anchor="w")
-        self._algo_label.grid(row=row, column=0, padx=18, sticky="w", pady=(2, 0))
+        self._algo_label.grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(af, text="Hash Mode (-m):", font=("Segoe UI", 12, "bold"), text_color=COLOR_TEXT_DIM).grid(row=0, column=1, padx=(0, 4))
+        self._hash_mode_entry = ctk.CTkEntry(af, font=("Consolas", 12, "bold"), width=60, height=26, corner_radius=6, border_width=1)
+        self._hash_mode_entry.grid(row=0, column=2)
         row += 1
 
-        self._hashfile_label = ctk.CTkLabel(parent, text="", font=FONT_PATH, text_color="#C084FC", anchor="w")
+        self._hashfile_label = ctk.CTkLabel(parent, text="", font=FONT_PATH, text_color="#10B981", anchor="w")
         self._hashfile_label.grid(row=row, column=0, padx=18, sticky="w", pady=(0, 6))
         row += 1
 
@@ -99,7 +107,7 @@ class DashboardMixin:
         self._device_menu.grid(row=0, column=0, sticky="ew", padx=(0, 12))
 
         self._bench_button = ctk.CTkButton(df, text="⏱️ Speed Test", font=("Segoe UI", 13, "bold"),
-            fg_color="#F39C12", hover_color="#D68910", corner_radius=10, height=38, width=140,
+            fg_color="#334155", hover_color="#475569", corner_radius=10, height=38, width=140,
             command=self._on_benchmark)
         self._bench_button.grid(row=0, column=1)
 
@@ -110,7 +118,7 @@ class DashboardMixin:
         row += 1
 
         self._progress_bar = ctk.CTkProgressBar(pf, height=14, corner_radius=6,
-            fg_color="#1E293B", progress_color="#6C63FF")
+            fg_color="#1E293B", progress_color="#10B981")
         self._progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, 12))
         self._progress_bar.set(0)
 
@@ -131,7 +139,7 @@ class DashboardMixin:
         self._crack_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
         self._restore_button = ctk.CTkButton(af, text="🔄 RESTORE", font=("Segoe UI", 16, "bold"),
-            fg_color="#0D6EFD", hover_color="#0A58CA", corner_radius=12, height=52,
+            fg_color="#334155", hover_color="#475569", corner_radius=12, height=52,
             command=self._on_restore)
         self._restore_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
         row += 1
@@ -142,18 +150,18 @@ class DashboardMixin:
         self._control_frame.grid_columnconfigure((0, 1, 2), weight=1)
         self._control_frame.grid_remove()
 
-        self._stop_button = ctk.CTkButton(self._control_frame, text="🛑  Durdur",
+        self._stop_button = ctk.CTkButton(self._control_frame, text="🛑  Stop",
             font=("Segoe UI", 13, "bold"), fg_color="#DC3545", hover_color="#A71D2A",
             corner_radius=10, height=38, command=self._on_stop)
         self._stop_button.grid(row=0, column=0, padx=(0, 4), sticky="ew")
 
-        self._pause_button = ctk.CTkButton(self._control_frame, text="⏸  Mola",
+        self._pause_button = ctk.CTkButton(self._control_frame, text="⏸  Pause",
             font=("Segoe UI", 13, "bold"), fg_color="#FD7E14", hover_color="#D36B0B",
             corner_radius=10, height=38, command=self._on_pause_toggle)
         self._pause_button.grid(row=0, column=1, padx=4, sticky="ew")
 
-        self._checkpoint_button = ctk.CTkButton(self._control_frame, text="💾  Kaydet & Çık",
-            font=("Segoe UI", 13, "bold"), fg_color="#0D6EFD", hover_color="#0A58CA",
+        self._checkpoint_button = ctk.CTkButton(self._control_frame, text="💾  Save & Exit",
+            font=("Segoe UI", 13, "bold"), fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             corner_radius=10, height=38, command=self._on_checkpoint)
         self._checkpoint_button.grid(row=0, column=2, padx=(4, 0), sticky="ew")
 

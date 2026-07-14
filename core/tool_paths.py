@@ -76,6 +76,7 @@ def validate_hashcat(directory: str | Path) -> Path | None:
         r = subprocess.run(
             [str(exe), "--version"],
             capture_output=True, text=True, timeout=10, cwd=str(d),
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
         if r.returncode == 0 and r.stdout.strip():
             log.info("Hashcat validated: %s (%s)", exe, r.stdout.strip())

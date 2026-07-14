@@ -1,4 +1,4 @@
-﻿"""ui_settings.py â€” General and Advanced settings tab builders (Mixin)."""
+"""ui_settings.py â€” General and Advanced settings tab builders (Mixin)."""
 
 import customtkinter as ctk
 from ui.theme import FONT_LABEL, FONT_INFO, COLOR_TEXT_DIM, ATTACK_MODES
@@ -15,30 +15,30 @@ class SettingsMixin:
             parent, values=ATTACK_MODES,
             variable=self._attack_mode_var, command=self._on_attack_mode_change
         ).grid(row=0, column=1, padx=16, pady=(16, 0), sticky="ew")
-        ctk.CTkLabel(parent, text="0: SÃ¶zlÃ¼k, 3: Maske, 6/7: Hybrid (SÃ¶zlÃ¼k+Maske).", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=1, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="0: Wordlist, 3: Mask, 6/7: Hybrid (Wordlist+Mask).", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=1, column=1, padx=16, sticky="w")
 
         ctk.CTkLabel(parent, text="Workload Profile (-w)", font=FONT_LABEL).grid(row=2, column=0, padx=16, pady=(12, 0), sticky="w")
         ctk.CTkOptionMenu(
             parent, values=["1 (Low)", "2 (Default)", "3 (High)", "4 (Nightmare)"],
             variable=self._workload_var, command=lambda e: self._save_config()
         ).grid(row=2, column=1, padx=16, pady=(12, 0), sticky="ew")
-        ctk.CTkLabel(parent, text="Nightmare (4) kartÄ± tam kapasite sÃ¶mÃ¼rÃ¼r.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=3, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="Nightmare (4) uses maximum GPU capacity.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=3, column=1, padx=16, sticky="w")
 
         ctk.CTkLabel(parent, text="Optimized Kernel (-O)", font=FONT_LABEL).grid(row=4, column=0, padx=16, pady=(12, 0), sticky="w")
         ctk.CTkSwitch(parent, text="Enable (Faster, max len 32)", variable=self._opt_kernel_var, command=self._save_config).grid(row=4, column=1, padx=16, pady=(12, 0), sticky="w")
-        ctk.CTkLabel(parent, text="Åifre 32 karakterden kÄ±saysa aÃ§Ä±n, ~%20 hÄ±z artÄ±ÅŸÄ±.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=5, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="Enable if password is < 32 chars, ~20% speed increase.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=5, column=1, padx=16, sticky="w")
 
         ctk.CTkLabel(parent, text="Session Name (--session)", font=FONT_LABEL).grid(row=6, column=0, padx=16, pady=(12, 0), sticky="w")
         e = ctk.CTkEntry(parent, textvariable=self._session_var, placeholder_text="my_session")
         e.grid(row=6, column=1, padx=16, pady=(12, 0), sticky="ew")
         e.bind("<KeyRelease>", lambda e: self._save_config())
-        ctk.CTkLabel(parent, text="Durdurulan iÅŸleme aynÄ± isimle devam edebilirsiniz.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=7, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="You can resume a stopped job with the same session name.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=7, column=1, padx=16, sticky="w")
 
-        # â”€â”€ Tool Paths â”€â”€
-        sep = ctk.CTkFrame(parent, fg_color="#30363D", height=1)
+        # ── Tool Paths ──
+        sep = ctk.CTkFrame(parent, fg_color="#334155", height=1)
         sep.grid(row=8, column=0, columnspan=2, padx=16, pady=(16, 4), sticky="ew")
 
-        ctk.CTkLabel(parent, text="ğŸ”§  Tool Paths", font=("Segoe UI", 15, "bold")).grid(row=9, column=0, columnspan=2, padx=16, pady=(4, 0), sticky="w")
+        ctk.CTkLabel(parent, text="🔧  Tool Paths", font=("Segoe UI", 15, "bold")).grid(row=9, column=0, columnspan=2, padx=16, pady=(4, 0), sticky="w")
 
         # Hashcat
         ctk.CTkLabel(parent, text="Hashcat Folder", font=FONT_LABEL).grid(row=10, column=0, padx=16, pady=(10, 0), sticky="w")
@@ -47,7 +47,7 @@ class SettingsMixin:
         hc_frame.grid_columnconfigure(0, weight=1)
         self._hc_entry = ctk.CTkEntry(hc_frame, textvariable=self._hc_path_var, placeholder_text="C:\\hashcat")
         self._hc_entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
-        ctk.CTkButton(hc_frame, text="ğŸ“‚", width=40, height=32, command=self._browse_hashcat).grid(row=0, column=1)
+        ctk.CTkButton(hc_frame, text="📁", width=40, height=32, command=self._browse_hashcat).grid(row=0, column=1)
         self._hc_status = ctk.CTkLabel(parent, text="", font=FONT_INFO, text_color="#4ADE80")
         self._hc_status.grid(row=11, column=1, padx=16, sticky="w")
 
@@ -58,7 +58,7 @@ class SettingsMixin:
         jtr_frame.grid_columnconfigure(0, weight=1)
         self._jtr_entry = ctk.CTkEntry(jtr_frame, textvariable=self._jtr_path_var, placeholder_text="C:\\john\\run")
         self._jtr_entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
-        ctk.CTkButton(jtr_frame, text="ğŸ“‚", width=40, height=32, command=self._browse_jtr).grid(row=0, column=1)
+        ctk.CTkButton(jtr_frame, text="📁", width=40, height=32, command=self._browse_jtr).grid(row=0, column=1)
         self._jtr_status = ctk.CTkLabel(parent, text="", font=FONT_INFO, text_color="#4ADE80")
         self._jtr_status.grid(row=13, column=1, padx=16, sticky="w")
 
@@ -92,13 +92,13 @@ class SettingsMixin:
     def _update_tool_status(self) -> None:
         import core.tool_paths as tool_paths
         if tool_paths.hashcat_exe:
-            self._hc_status.configure(text=f"âœ… {tool_paths.hashcat_exe.name} found", text_color="#4ADE80")
+            self._hc_status.configure(text=f"✅ {tool_paths.hashcat_exe.name} found", text_color="#4ADE80")
         else:
-            self._hc_status.configure(text="âŒ Not found", text_color="#FF6B6B")
+            self._hc_status.configure(text="❌ Not found", text_color="#FF6B6B")
         if tool_paths.jtr_dir:
-            self._jtr_status.configure(text=f"âœ… {tool_paths.jtr_dir.name}/ found", text_color="#4ADE80")
+            self._jtr_status.configure(text=f"✅ {tool_paths.jtr_dir.name}/ found", text_color="#4ADE80")
         else:
-            self._jtr_status.configure(text="âš ï¸ Not found (optional)", text_color="#FFA500")
+            self._jtr_status.configure(text="⚠️ Not found (optional)", text_color="#FFA500")
 
     def _build_advanced(self, parent) -> None:
         parent.grid_columnconfigure(1, weight=1)
@@ -109,17 +109,17 @@ class SettingsMixin:
             parent, values=["70", "75", "80", "85", "90", "95", "100"],
             variable=self._temp_abort_var, command=lambda e: self._save_config()
         ).grid(row=0, column=1, padx=16, pady=(16, 0), sticky="ew")
-        ctk.CTkLabel(parent, text="Kart bu sÄ±caklÄ±ÄŸa ulaÅŸÄ±rsa iÅŸlem iptal edilir.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=1, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="Process is aborted if GPU reaches this temperature.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=1, column=1, padx=16, sticky="w")
 
         ctk.CTkLabel(parent, text="Custom Charset 1 (-1)", font=FONT_LABEL).grid(row=2, column=0, padx=16, pady=(12, 0), sticky="w")
-        e2 = ctk.CTkEntry(parent, textvariable=self._charset1_var, placeholder_text="Ã–rn: ?l?d?u")
+        e2 = ctk.CTkEntry(parent, textvariable=self._charset1_var, placeholder_text="e.g., ?l?d?u")
         e2.grid(row=2, column=1, padx=16, pady=(12, 0), sticky="ew")
         e2.bind("<KeyRelease>", lambda e: self._save_config())
-        ctk.CTkLabel(parent, text="Maskede '-1' yerine geÃ§ecek karakter havuzu.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=3, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="Character pool for '-1' in mask.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=3, column=1, padx=16, sticky="w")
 
         ctk.CTkLabel(parent, text="Disable Potfile", font=FONT_LABEL).grid(row=4, column=0, padx=16, pady=(12, 0), sticky="w")
         ctk.CTkSwitch(parent, text="Ignore previous cracks", variable=self._disable_potfile_var, command=self._save_config).grid(row=4, column=1, padx=16, pady=(12, 0), sticky="w")
-        ctk.CTkLabel(parent, text="Daha Ã¶nce kÄ±rÄ±lmÄ±ÅŸ ÅŸifreleri yoksayar.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=5, column=1, padx=16, sticky="w")
+        ctk.CTkLabel(parent, text="Ignores previously cracked passwords.", font=FONT_INFO, text_color=COLOR_TEXT_DIM).grid(row=5, column=1, padx=16, sticky="w")
 
         ctk.CTkLabel(parent, text="Skip (-s)", font=FONT_LABEL).grid(row=6, column=0, padx=16, pady=(12, 0), sticky="w")
         e4 = ctk.CTkEntry(parent, textvariable=self._skip_var, placeholder_text="0", validate="key", validatecommand=vcmd)

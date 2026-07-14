@@ -111,24 +111,24 @@ Shatter/
 
 ### Gereksinimler
 - **Python 3.11+**
-- **Hashcat** (indirip bir klasöre çıkar, Shatter otomatik bulur)
-- **John the Ripper** (opsiyonel — şifreli dosyalardan hash çıkarmak için)
+- **Hashcat** (Sisteminizde yoksa uygulama içinden yolunu belirtebilirsiniz)
+- **John the Ripper** (Opsiyonel — şifreli dosyalardan hash çıkarmak için `*2john` araçları)
 
 ### Adımlar
 
 ```bash
 # 1. Repo'yu klonla
-git clone https://github.com/BurakOzsworthy/Shatter.git
+git clone https://github.com/burakxrd/Shatter.git
 cd Shatter
 
 # 2. Bağımlılıkları kur
-pip install customtkinter psutil name-that-hash scapy
+pip install -r requirements.txt
 
 # 3. Çalıştır
 python shatter.pyw
 ```
 
-> **Not:** İlk açılışta Hashcat bulunamazsa, uygulama seni General sekmesindeki "Tool Paths" bölümüne yönlendirir.
+> **Not:** İlk açılışta Hashcat bulunamazsa, uygulama seni General sekmesindeki "Tool Paths" bölümüne yönlendirir. Windows kullanıcıları için ileride tek tıklamalı `.exe` sürümü de eklenecektir.
 
 ---
 
@@ -146,20 +146,13 @@ python shatter.pyw
 
 ## 🗺️ Yol Haritası (Roadmap)
 
-### v1.2 — Kısa Vade
-- [ ] 🧠 **Smart Attack Pipeline** — Tek tuşla otomatik saldırı zinciri: potfile check → top-100 şifre → rockyou+best64 → mask → hybrid
-- [ ] 📊 **Canlı GPU Dashboard** — Sıcaklık, hız (MH/s), kırılan/toplam oranı gerçek zamanlı grafiklerle
-- [ ] 📂 **Drag & Drop** — Hash, wordlist ve capture dosyalarını sürükle-bırak
-- [ ] 🌐 **Wordlist Manager** — Popüler wordlist'leri tek tıkla indir (rockyou, kaonashi vb.) + CUPP benzeri özel liste oluşturucu
+Şu anki hedeflerimiz, Shatter'ı daha kararlı, kolay dağıtılabilir ve günlük pentest süreçlerinde daha kullanışlı hale getirmektir.
 
-### v2.0 — Orta Vade
-- [ ] 🤖 **AI Pattern Analizi** — Kırılan şifrelerden pattern çıkar, buna göre otomatik mask/rule üret
-- [ ] 📁 **Proje / Kampanya Sistemi** — Hedef bazlı hash, wordlist ve sonuç yönetimi + PDF/HTML rapor export
-- [ ] 🔌 **Plugin Sistemi** — `plugins/` klasöründen Python ile özel attack pipeline'ları
-
-### v3.0 — Uzun Vade
-- [ ] 📡 **Distributed Cracking** — LAN üzerinde otomatik keşifli, tek dosya worker agent ile basitleştirilmiş dağıtık kırma
-- [ ] 🌐 **Web UI Alternatifi** — Tauri veya Electron tabanlı cross-platform arayüz
+- [ ] 📦 **Kolay Kurulum & Dağıtım** — Kullanıcıların Python bağımlılıklarıyla uğraşmaması için `PyInstaller` ile tek tıklamalı `.exe` derlemesi.
+- [ ] 📥 **Otomatik Araç İndirme** — Sistemde Hashcat veya JtR bulunamazsa, kullanıcı onayıyla arka planda en güncel sürümlerini indirip kurma.
+- [ ] 📄 **Raporlama (Export)** — Kırılan şifreleri ve oturum istatistiklerini CSV veya HTML formatında dışa aktarma yeteneği.
+- [ ] 📂 **Sürükle & Bırak (Drag & Drop)** — `.cap`, `.txt` veya wordlist dosyalarını doğrudan uygulamanın üzerine sürükleyerek hızlıca işleme alma.
+- [ ] 🌐 **Arayüz İyileştirmeleri** — Kullanıcı deneyimini artıracak ufak animasyonlar, hata mesajlarının daha belirgin hale getirilmesi.
 
 ---
 

@@ -17,6 +17,54 @@ from ui.theme import COLOR_TEXT, COLOR_TEXT_DIM
 _RE_PROGRESS = re.compile(r"Progress\.+:\s*\d+/\d+\s*\((\d+(?:\.\d+)?)%\)")
 _RE_ETA = re.compile(r"Time\.Estimated\.+:\s*.+?\(([^)]+)\)")
 
+# ── Hashcat Output Filter ──
+# Strips verbose noise so the Event Log stays clean and readable.
+
+_NOISE_CONTAINS = [
+    "Please be patient", "Initialized", "Initializing",
+    "Counting lines", "Counted lines", "Parsed Hashes",
+    "Sorting ", "Sorted ", "Removing duplicate", "Removed duplicate",
+    "Comparing hashes", "Compared hashes",
+    "Generating bitmap", "Generated bitmap",
+    "self-test", "autotune",
+    "[s]tatus [p]ause", "nvmlDeviceGetFanSpeed",
+    "Host memory allocated",
+]
+
+_NOISE_PREFIXES = (
+    "Minimum password", "Maximum password",
+    "Minimum salt length", "Maximum salt length",
+    "Optimizers applied", "Watchdog:", "Hashes:", "Bitmaps:", "Rules:",
+    "CUDA API", "OpenCL API",
+    "Kernel.Feature", "Guess.Queue", "Rejected",
+    "Restore.Point", "Restore.Sub", "Candidate.Engine",
+    "Candidates.#", "Hardware.Mon",
+    "ATTENTION!", "Pure kernels", "If you want to switch",
+    "See the above message",
+    "Started:", "Stopped:",
+    "[*] Command:",
+    "Dictionary cache",
+)
+
+
+def _is_output_noise(line: str) -> bool:
+    """Return True if this line should be hidden from the Event Log."""
+    s = line.strip()
+    if not s or s.startswith("===="):
+        return True
+    # Bullet lines: keep active device + wordlist filename/count, drop rest
+    if s.startswith("* "):
+        keep = (
+            (s.startswith("* Device") and "skipped" not in s)
+            or s.startswith("* Filename")
+            or s.startswith("* Passwords")
+        )
+        return not keep
+    for kw in _NOISE_CONTAINS:
+        if kw in s:
+            return True
+    return s.startswith(_NOISE_PREFIXES)
+
 
 def _select_file(title: str, filetypes=None) -> str:
     if filetypes is None:
@@ -49,8 +97,13 @@ class HandlersMixin:
                 text=f"Detected:  {algo}",
                 text_color="#4ADE80" if algo != "Unknown / Custom" else "#FF6B6B",
             )
+            m_val = extract_m_value(algo)
+            if m_val:
+                self._hash_mode_entry.delete(0, "end")
+                self._hash_mode_entry.insert(0, m_val)
         else:
             self._algo_label.configure(text="Detected Algorithm:  None", text_color=COLOR_TEXT_DIM)
+            self._hash_mode_entry.delete(0, "end")
         self._save_config()
 
     # ── Hash Extraction (from encrypted files) ──
@@ -131,6 +184,56 @@ class HandlersMixin:
             names = [Path(p).name for p in self._rule_paths]
             self._rule_path_label.configure(text=" + ".join(names), text_color=COLOR_TEXT)
 
+    # ── Drag & Drop ──
+
+    def _on_file_drop(self, event) -> None:
+        if not event.data:
+            return
+        
+        # tk.splitlist properly parses drag & drop paths (handles spaces and braces automatically)
+        paths = self.tk.splitlist(event.data)
+        if not paths:
+            return
+            
+        path = paths[0]
+        ext = path.lower().split('.')[-1]
+        
+        if f".{ext}" in HASH_EXTRACTORS or f".{ext}" in CAP_EXTENSIONS:
+            self._term_clear()
+            self._term_append(f"[*] Extracting hash from dropped file: {path}\n")
+            def _run():
+                result = extract_hash_from_file(path)
+                self.after(0, self._finish_extraction, result)
+            threading.Thread(target=_run, daemon=True).start()
+        elif ext in ("txt", "dic", "wordlist"):
+            try:
+                # Basic check to see if it's a hash list or a wordlist
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    first_line = f.readline().strip()
+                if first_line:
+                    algo = detect_hash_type(first_line)
+                    if algo != "Unknown / Custom":
+                        self._hash_file_path = path
+                        display = path if len(path) <= 50 else f"…{path[-48:]}"
+                        self._hashfile_label.configure(text=f"📋 Hash File: {display}")
+                        self._term_append(f"[+] Dropped file loaded as Hash list: {path}\n")
+                    else:
+                        self._wordlist_path = path
+                        display = path if len(path) <= 52 else f"…{path[-50:]}"
+                        self._wl_path_label.configure(text=display, text_color=COLOR_TEXT)
+                        self._term_append(f"[+] Dropped file loaded as Wordlist: {path}\n")
+            except Exception as e:
+                self._term_append(f"[!] Failed to read file: {e}\n")
+        elif ext in ("rule", "rules"):
+            if path not in self._rule_paths:
+                self._rule_paths.append(path)
+                self._update_rule_label()
+                self._term_append(f"[+] Dropped rule file added: {path}\n")
+        else:
+            self._term_append(f"[!] Unsupported file type dropped: {path}\n")
+            
+        self._save_config()
+
     # ── Progress Parsing ──
 
     def _parse_and_update_progress(self, text: str) -> None:
@@ -169,16 +272,12 @@ class HandlersMixin:
             return
 
         # Determine hash mode
-        if hash_value:
-            algo_str = detect_hash_type(hash_value)
-            m_value = extract_m_value(algo_str)
-        else:
-            m_value = None
+        m_value = self._hash_mode_entry.get().strip()
 
         if not m_value:
             self._term_clear()
             self._term_append("[!] Could not determine Hashcat mode (-m).\n")
-            self._term_append("[*] Hash file modunda ilk hash'i entry'ye yapıştırarak mode belirleyin.\n")
+            self._term_append("[*] Please type the Hashcat Mode (-m) manually or paste a recognizable hash.\n")
             return
 
         self._crack_button.configure(state="disabled", text="⏳  Running…")
@@ -212,8 +311,9 @@ class HandlersMixin:
         }
 
         def _on_output(text):
-            self.after(0, self._term_append, text)
             self.after(0, self._parse_and_update_progress, text)
+            if not _is_output_noise(text):
+                self.after(0, self._term_append, text)
 
         def _on_done():
             self.after(0, self._crack_done)
@@ -226,7 +326,7 @@ class HandlersMixin:
         self._restore_button.configure(state="normal")
         self._bench_button.configure(state="normal")
         self._control_frame.grid_remove()
-        self._pause_button.configure(text="⏸  Mola", fg_color="#FD7E14", hover_color="#D36B0B")
+        self._pause_button.configure(text="⏸  Pause", fg_color="#FD7E14", hover_color="#D36B0B")
 
     # ── RESTORE ──
 
@@ -234,7 +334,7 @@ class HandlersMixin:
         session = self._session_var.get().strip()
         if not session:
             self._term_clear()
-            self._term_append("[!] Error: Session name boş. General sekmesinden bir isim girin.\n")
+            self._term_append("[!] Error: Session name is empty. Please enter a name in the General tab.\n")
             return
 
         self._crack_button.configure(state="disabled")
@@ -245,8 +345,9 @@ class HandlersMixin:
         self._eta_label.configure(text="Restoring…")
 
         def _on_output(text):
-            self.after(0, self._term_append, text)
             self.after(0, self._parse_and_update_progress, text)
+            if not _is_output_noise(text):
+                self.after(0, self._term_append, text)
 
         def _on_done():
             self.after(0, self._restore_done)
@@ -259,7 +360,7 @@ class HandlersMixin:
         self._restore_button.configure(state="normal", text="🔄 RESTORE")
         self._bench_button.configure(state="normal")
         self._control_frame.grid_remove()
-        self._pause_button.configure(text="⏸  Mola", fg_color="#FD7E14", hover_color="#D36B0B")
+        self._pause_button.configure(text="⏸  Pause", fg_color="#FD7E14", hover_color="#D36B0B")
 
     # ── BENCHMARK ──
 
@@ -270,7 +371,8 @@ class HandlersMixin:
         self._term_clear()
 
         def _on_output(text):
-            self.after(0, self._term_append, text)
+            if not _is_output_noise(text):
+                self.after(0, self._term_append, text)
 
         def _on_done():
             self.after(0, self._bench_done)
@@ -285,17 +387,17 @@ class HandlersMixin:
 
     def _on_stop(self) -> None:
         hashcat_stop()
-        self._term_append("\n[!] Hashcat durduruldu (kill).\n")
+        self._term_append("\n[!] Hashcat stopped (killed).\n")
 
     def _on_pause_toggle(self) -> None:
         if is_hashcat_paused():
             if hashcat_resume():
-                self._pause_button.configure(text="⏸  Mola", fg_color="#FD7E14", hover_color="#D36B0B")
-                self._term_append("[*] Hashcat devam ediyor...\n")
+                self._pause_button.configure(text="⏸  Pause", fg_color="#FD7E14", hover_color="#D36B0B")
+                self._term_append("[*] Hashcat resumed...\n")
         else:
             if hashcat_pause():
-                self._pause_button.configure(text="▶  Devam", fg_color="#198754", hover_color="#146C43")
-                self._term_append("[*] Hashcat duraklatıldı (mola).\n")
+                self._pause_button.configure(text="▶  Resume", fg_color="#198754", hover_color="#146C43")
+                self._term_append("[*] Hashcat paused.\n")
 
     def _on_checkpoint(self) -> None:
         session = self._session_var.get().strip()
@@ -303,4 +405,4 @@ class HandlersMixin:
         if session:
             self._term_append(f"\n[*] Checkpoint (session: {session})…\n")
         else:
-            self._term_append("\n[!] Session adı yok — restore dosyası oluşmayabilir.\n")
+            self._term_append("\n[!] No session name — restore file may not be created.\n")
