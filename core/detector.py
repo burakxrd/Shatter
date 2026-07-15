@@ -111,7 +111,7 @@ _HASHCAT_FALLBACKS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'^md5[a-f0-9]{32}$'), "PostgreSQL MD5 (m=12)"),
 
     # macOS v10.8+
-    (re.compile(r'^\$ml\$\d+\$[a-f0-9]{64}\$[a-f0-9]{128}$'), "macOS v10.8+ (m=7100)"),
+    (re.compile(r'^\$ml\$\d+\$[a-fA-F0-9]+\$[a-fA-F0-9]+$'), "macOS v10.8+ (m=7100)"),
 
     # Oracle 11g+
     (re.compile(r'^S:[A-Fa-f0-9]{60}$'), "Oracle 11g+ (m=112)"),
@@ -153,34 +153,38 @@ def detect_hash_type(hash_value: str) -> str:
     if not h:
         return "None"
 
-    # ── Step 1: name-that-hash (lazy import to speed up app startup) ──
-    try:
-        from name_that_hash import runner
-        api_result = runner.api_return_hashes_as_dict([h])
-        nth_matches = api_result.get(h, [])
-    except Exception:
-        nth_matches = []
-
-    # Filter: only keep results with a valid Hashcat mode, skip extended (rare) variants
     candidates: list[str] = []
-    for match in nth_matches:
-        hc_mode = match.get("hashcat")
-        name = match.get("name", "Unknown")
-        extended = match.get("extended", False)
 
-        if hc_mode is not None and not extended:
-            candidates.append(f"{name} (m={hc_mode})")
+    # ── Step 1: Hashcat-specific unambiguous patterns ──
+    # Check these first, because NTH sometimes hallucinates on custom Hashcat formats
+    # (e.g. $rar5$ being detected as SAP CODVN B).
+    for pattern, label in _HASHCAT_FALLBACKS:
+        if pattern.search(h):
+            candidates.append(label)
+            break
+
+    # ── Step 2: name-that-hash (lazy import) ──
+    # Only run if we didn't find a definitive Hashcat-specific match
+    if not candidates:
+        try:
+            from name_that_hash import runner
+            api_result = runner.api_return_hashes_as_dict([h])
+            nth_matches = api_result.get(h, [])
+        except Exception:
+            nth_matches = []
+
+        # Filter: only keep results with a valid Hashcat mode
+        for match in nth_matches:
+            hc_mode = match.get("hashcat")
+            name = match.get("name", "Unknown")
+            extended = match.get("extended", False)
+
+            if hc_mode is not None and not extended:
+                candidates.append(f"{name} (m={hc_mode})")
 
     # Limit to top 5 most popular to keep UI clean
     if len(candidates) > 5:
         candidates = candidates[:5]
-
-    # ── Step 2: Fallback — Hashcat-specific patterns NTH misses ──
-    if not candidates:
-        for pattern, label in _HASHCAT_FALLBACKS:
-            if pattern.search(h):
-                candidates.append(label)
-                break  # First match is enough for prefix-based patterns
 
     # ── De-duplicate while preserving order ──
     seen: set[str] = set()

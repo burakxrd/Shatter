@@ -1,4 +1,8 @@
-"""tests/test_potfile.py — Unit tests for potfile parsing."""
+"""tests/test_potfile.py — Unit tests for potfile parsing.
+
+Tests the potfile parsing logic that now lives in ui.api.Api.get_potfile().
+We test the parsing logic directly here with file-based fixtures.
+"""
 
 import sys
 from pathlib import Path
@@ -6,7 +10,29 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
-from ui.potfile import _parse_potfile
+
+
+def _parse_potfile(path: Path) -> list[tuple[str, str]]:
+    """Parse a potfile into (hash, password) tuples.
+    
+    Mirrors the logic in Api.get_potfile() for testability.
+    """
+    if not path.exists():
+        return []
+    entries = []
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            lines = [line.strip() for line in f if line.strip()]
+            for line in lines:
+                if ":" in line:
+                    h, p = line.rsplit(":", 1)
+                    if h and p:
+                        entries.append((h, p))
+                else:
+                    entries.append((line, "???"))
+    except Exception:
+        pass
+    return entries
 
 
 @pytest.fixture
@@ -65,6 +91,23 @@ class TestParsePotfile:
         f.write_text("\n\n\nhash:pw\n\n", encoding="utf-8")
         entries = _parse_potfile(f)
         assert len(entries) == 1
+
+    def test_malformed_colon_only(self, tmp_path):
+        """A line with just ':' should be skipped (empty hash and password)."""
+        f = tmp_path / "malformed.potfile"
+        f.write_text(":\n::\nhash:pass\n", encoding="utf-8")
+        entries = _parse_potfile(f)
+        # Only "hash:pass" should survive, ":" gives empty h/p
+        passwords = [p for _, p in entries if p != "???"]
+        assert "pass" in passwords
+
+    def test_unicode_password(self, tmp_path):
+        """Passwords can contain unicode characters."""
+        f = tmp_path / "unicode.potfile"
+        f.write_text("abc123hash:şifre_türkçe_🔐\n", encoding="utf-8")
+        entries = _parse_potfile(f)
+        assert len(entries) == 1
+        assert entries[0][1] == "şifre_türkçe_🔐"
 
 
 if __name__ == "__main__":

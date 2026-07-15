@@ -5,38 +5,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shatter</title>
-    <!-- Tailwind CSS (CDN) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        bgPrimary: '#0a0a0a',
-                        bgCard: '#171717',
-                        bgCardHover: '#1c1c1c',
-                        borderSubtle: 'rgba(255, 255, 255, 0.05)',
-                        textPrimary: '#e2e8f0',
-                        textDim: '#94a3b8',
-                        accent: '#f97316',
-                        accentHover: '#ea580c',
-                        danger: '#ef4444',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Google Fonts -->
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
+    <!-- Tailwind CSS (Pre-compiled, offline) -->
+    <link rel="stylesheet" href="style.css">
 
     <style>
+        /* Local Fonts (Offline) */
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url('fonts/inter-400.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 500;
+            font-display: swap;
+            src: url('fonts/inter-500.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 600;
+            font-display: swap;
+            src: url('fonts/inter-600.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 700;
+            font-display: swap;
+            src: url('fonts/inter-700.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'JetBrains Mono';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url('fonts/jetbrains-mono-400.ttf') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'JetBrains Mono';
+            font-style: normal;
+            font-weight: 500;
+            font-display: swap;
+            src: url('fonts/jetbrains-mono-500.ttf') format('truetype');
+        }
+
         /* Pywebview drag region */
         .pywebview-drag-region {
             -webkit-app-region: drag;
@@ -84,6 +105,159 @@
 
         .slide-over.open {
             transform: translateX(0);
+        }
+
+        /* Form Locking (disabled state during crack) */
+        .form-locked {
+            opacity: 0.5;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* Log-level colorization */
+        .log-error {
+            color: #ef4444;
+        }
+
+        .log-success {
+            color: #22c55e;
+        }
+
+        .log-info {
+            color: #f97316;
+        }
+
+        /* Spinner animation */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Disabled button state */
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Structured Event Log Styles */
+        .log-separator {
+            height: 1px;
+            background: hsla(0, 0%, 100%, 0.05);
+            margin: 0.5rem 0;
+        }
+
+        .log-event {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.25rem 0;
+            line-height: 1.4;
+        }
+
+        .log-event-time {
+            color: #64748b;
+            font-size: 0.65rem;
+            margin-top: 0.1rem;
+            min-width: 45px;
+        }
+
+        .log-event-icon {
+            font-size: 0.8rem;
+            margin-top: 0.1rem;
+        }
+
+        .log-event-text {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            word-break: break-all;
+        }
+
+        .log-event-error .log-event-text {
+            color: #ef4444;
+        }
+
+        .log-event-success .log-event-text {
+            color: #22c55e;
+        }
+
+        .log-event-info .log-event-text {
+            color: #f97316;
+        }
+
+        .log-event-cracked {
+            margin: 0.75rem 0;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 0.5rem;
+            background: rgba(16, 185, 129, 0.05);
+            overflow: hidden;
+        }
+
+        .log-cracked-header {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .log-cracked-label {
+            color: #34d399;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .log-cracked-body {
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .log-cracked-hash {
+            color: #94a3b8;
+            font-size: 0.65rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .log-cracked-password {
+            color: #34d399;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            text-decoration-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .live-stat-box {
+            display: flex;
+            flex-direction: column;
+            background: #171717;
+            border: 1px solid hsla(0, 0%, 100%, 0.05);
+            border-radius: 0.5rem;
+            padding: 0.35rem 0.5rem;
+            flex: 1;
+        }
+
+        .live-stat-label {
+            font-size: 0.6rem;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .live-stat-value {
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
         }
     </style>
 </head>
@@ -175,7 +349,14 @@
                             <label class="text-xs font-semibold tracking-wider text-textDim uppercase">TARGET
                                 HASH</label>
                             <div class="flex gap-2">
-                                <button onclick="extractHash()"
+                                <button id="btn-clear-hash" onclick="clearHash()" title="Clear Hash"
+                                    class="text-xs font-medium px-3 py-1.5 bg-bgPrimary border border-borderSubtle hover:border-red-500 hover:text-red-500 rounded-md transition-colors flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                    Clear
+                                </button>
+                                <button id="btn-extract" onclick="extractHash()"
                                     class="text-xs font-medium px-3 py-1.5 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-md transition-colors flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -184,7 +365,7 @@
                                     </svg>
                                     Extract from File
                                 </button>
-                                <button onclick="loadHashFile()"
+                                <button id="btn-load-hashfile" onclick="loadHashFile()"
                                     class="text-xs font-medium px-3 py-1.5 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-md transition-colors flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -223,10 +404,10 @@
                         <label class="text-xs font-semibold tracking-wider text-textDim uppercase">ATTACK
                             PAYLOAD</label>
 
-                        <div id="payload-container" class="flex flex-col gap-4">
+                        <div id="payload-container" class="flex flex-col gap-4" data-lock-group>
                             <!-- Wordlist -->
                             <div class="flex items-center gap-3">
-                                <button onclick="selectWordlist()"
+                                <button id="btn-wordlist" onclick="selectWordlist()"
                                     class="shrink-0 text-sm font-medium px-4 py-2 bg-bgPrimary border border-borderSubtle hover:border-accent hover:text-accent rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -240,7 +421,7 @@
 
                             <!-- Rules / Mask (Dynamic) -->
                             <div id="rule-section" class="flex items-center gap-3">
-                                <button onclick="addRule()"
+                                <button id="btn-add-rule" onclick="addRule()"
                                     class="shrink-0 text-sm font-medium px-4 py-2 bg-bgPrimary border border-borderSubtle hover:border-textDim rounded-lg transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -268,7 +449,7 @@
                         class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all col-span-4 p-6 flex flex-col gap-4">
                         <label class="text-xs font-semibold tracking-wider text-textDim uppercase">HARDWARE</label>
                         <select id="device-select"
-                            class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent cursor-pointer appearance-none">
+                            class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent cursor-pointer appearance-none text-ellipsis overflow-hidden whitespace-nowrap">
                             <option value="1">Loading devices...</option>
                         </select>
 
@@ -319,7 +500,7 @@
                     </div>
 
                     <!-- Process Controls (Hidden by default) -->
-                    <div id="process-controls" class="col-span-12 hidden flex gap-4">
+                    <div id="process-controls" class="col-span-12 flex gap-4" style="display: none">
                         <button onclick="stopCrack()"
                             class="flex-1 py-3 rounded-lg bg-danger/20 text-danger border border-danger/50 hover:bg-danger/30 font-semibold transition-colors">
                             Stop
@@ -339,7 +520,8 @@
                             class="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 shadow-[0_0_40px_rgba(16,185,129,0.2)] animate-[pulse_3s_ease-in-out_infinite]">
                             <h2 class="text-emerald-500 font-bold tracking-widest uppercase text-sm">Target Cracked
                                 Successfully</h2>
-                            <div class="select-text text-4xl font-mono text-white tracking-wider" id="cracked-password-display">
+                            <div class="select-text text-4xl font-mono text-white tracking-wider"
+                                id="cracked-password-display">
                             </div>
                             <button onclick="dismissReveal()"
                                 class="mt-4 text-xs text-textDim hover:text-white transition-colors uppercase tracking-widest border-b border-transparent hover:border-white pb-1">
@@ -383,6 +565,18 @@
                             <!-- Dynamic Rows -->
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="potfile-empty-state" class="hidden flex flex-col items-center justify-center py-16 gap-4">
+                    <svg class="w-16 h-16 text-textDim" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        stroke-width="1">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                        </path>
+                    </svg>
+                    <p class="text-textDim text-lg font-medium">No cracked passwords yet</p>
+                    <p class="text-textDim text-sm">Start cracking to see results here!</p>
                 </div>
             </div>
 
@@ -511,16 +705,78 @@
             class="w-[400px] border-l border-borderSubtle bg-bgCard flex flex-col shrink-0 slide-over fixed right-0 top-10 bottom-0 z-50 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]">
             <div class="h-14 border-b border-borderSubtle flex justify-between items-center px-4 shrink-0 bg-bgPrimary">
                 <h3 class="font-semibold text-textPrimary tracking-wide">Event Log</h3>
-                <button onclick="toggleLogs()" class="text-textDim hover:text-white transition-colors p-1">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                </button>
-            </div>
-            <div class="flex-1 overflow-hidden relative">
-                <div id="terminal"
-                    class="select-text absolute inset-0 overflow-y-auto p-4 font-mono text-xs leading-relaxed text-textDim whitespace-pre-wrap selection:bg-accent/30 selection:text-white">
+                <div class="flex items-center gap-2">
+                    <button onclick="clearTerminal()" class="text-textDim hover:text-accent transition-colors p-1"
+                        title="Clear logs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                            </path>
+                        </svg>
+                    </button>
+                    <button onclick="toggleLogs()" class="text-textDim hover:text-white transition-colors p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+                            </path>
+                        </svg>
+                    </button>
                 </div>
+            </div>
+
+            <!-- Structured Log Content -->
+            <div class="flex-1 flex flex-col overflow-hidden relative">
+
+                <!-- 1. Session Info Header (Hidden by default) -->
+                <div id="log-session-info"
+                    class="hidden shrink-0 border-b border-borderSubtle bg-bgPrimary p-3 flex flex-col gap-2 font-mono text-xs select-text">
+                    <!-- Device Row -->
+                    <div id="log-device-row" class="hidden flex items-start gap-2">
+                        <span class="text-textDim shrink-0">Device:</span>
+                        <div>
+                            <span id="log-device-name" class="text-textPrimary"></span>
+                            <span id="log-device-detail" class="text-textDim"></span>
+                        </div>
+                    </div>
+                    <!-- Hash Mode Row -->
+                    <div id="log-hashmode-row" class="hidden flex items-start gap-2">
+                        <span class="text-textDim shrink-0">Mode..:</span>
+                        <div>
+                            <span id="log-hashmode-name" class="text-accent"></span>
+                            <span id="log-hashmode-code" class="text-textDim ml-1"></span>
+                        </div>
+                    </div>
+                    <!-- Wordlist Row -->
+                    <div id="log-wordlist-row" class="hidden flex items-start gap-2">
+                        <span class="text-textDim shrink-0">Input.:</span>
+                        <div>
+                            <span id="log-wordlist-name" class="text-textPrimary"></span>
+                            <span id="log-wordlist-detail" class="text-textDim ml-1"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Live Stats (In-place updates) -->
+                <div id="log-live-stats"
+                    class="hidden shrink-0 border-b border-borderSubtle bg-bgPrimary p-3 flex gap-2">
+                    <div class="live-stat-box">
+                        <span class="live-stat-label">Speed</span>
+                        <span class="live-stat-value" id="log-speed">--</span>
+                    </div>
+                    <div class="live-stat-box">
+                        <span class="live-stat-label">ETA</span>
+                        <span class="live-stat-value" id="log-eta">--</span>
+                    </div>
+                    <div class="live-stat-box">
+                        <span class="live-stat-label">Recovered</span>
+                        <span class="live-stat-value" id="log-recovered">--</span>
+                    </div>
+                </div>
+
+                <!-- 3. Event Stream (Scrollable) -->
+                <div id="log-events" class="flex-1 overflow-y-auto p-3 font-mono select-text">
+                    <!-- Dynamic Event Cards will be appended here -->
+                </div>
+
             </div>
         </div>
 

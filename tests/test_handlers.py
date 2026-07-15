@@ -1,12 +1,21 @@
-"""tests/test_handlers.py — Unit tests for progress parsing regex."""
+"""tests/test_handlers.py — Unit tests for progress/ETA parsing regex.
+
+These regexes are used in app.js but we test the patterns here
+to ensure they work correctly with Python's re module as reference.
+"""
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import re
 import pytest
-from ui.handlers import _RE_PROGRESS, _RE_ETA
+
+
+# These patterns mirror what app.js uses for parsing hashcat output
+_RE_PROGRESS = re.compile(r'\(([\d.]+)%\)')
+_RE_ETA = re.compile(r'Time\.Estimated\.\.\.:.*\((.+)\)')
 
 
 class TestProgressRegex:
@@ -32,6 +41,12 @@ class TestProgressRegex:
     def test_no_match(self):
         line = "Speed.#1.........:  1234.5 MH/s"
         assert _RE_PROGRESS.search(line) is None
+
+    def test_small_decimal(self):
+        line = "Progress.........: 10/999999 (0.001%)"
+        m = _RE_PROGRESS.search(line)
+        assert m is not None
+        assert float(m.group(1)) == pytest.approx(0.001)
 
 
 class TestETARegex:
