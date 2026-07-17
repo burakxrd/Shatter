@@ -1,0 +1,53 @@
+# Shatter - .gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Runtime / Temporary files
+temp/
+!temp/.gitkeep
+
+# Logs
+*.log
+
+# Hashcat binaries (too large for git)
+hashcat/
+!hashcat/.gitkeep
+
+# John the Ripper binaries
+johntheripper/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.resolved
+kernels/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+*.spec.bak
+
+# Environment
+.env
+.venv/
+venv/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Agents
+.agents/
+
+# Ignored Folders
+graphify-out/
+.github/
+tests/
+docs/

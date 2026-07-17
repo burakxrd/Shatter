@@ -1,0 +1,37 @@
+[project]
+name = "shatter"
+version = "1.0.0"
+description = "Advanced hash cracking platform with automatic detection, encrypted file support, and native PCAP parsing."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "burakxrd"}
+]
+keywords = ["hashcat", "hash-cracking", "security", "pentest", "cybersecurity"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "pywebview",
+    "psutil",
+    "name-that-hash",
+    "scapy",
+    "py7zr",
+]
+
+[project.urls]
+Homepage = "https://github.com/burakxrd/Shatter"
+Repository = "https://github.com/burakxrd/Shatter"
+"Bug Tracker" = "https://github.com/burakxrd/Shatter/issues"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
