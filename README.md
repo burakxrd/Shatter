@@ -154,16 +154,6 @@ python shatter.pyw
 
 ---
 
-## 🗺️ Roadmap
-
-- [x] 📦 **Easy Distribution** — Single-click `.exe` via PyInstaller
-- [x] 📥 **Auto Tool Download** — Download Hashcat/JtR automatically if not found
-- [x] 🌐 **UI Polish** — Animations, better error feedback, toast notifications
-- [ ] 📄 **Reporting** — Export cracked passwords and session stats as CSV/HTML
-- [ ] 📂 **Drag & Drop** — Drop `.cap`, wordlists, or hash files directly onto the app
-
----
-
 ## 🆚 Why Shatter?
 
 | Feature | hashcat-gui | Hashtopolis | CrackQ | **Shatter** |
