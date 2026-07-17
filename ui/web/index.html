@@ -259,10 +259,79 @@
             font-weight: 500;
             font-family: 'JetBrains Mono', monospace;
         }
+
+        /* Toast Notifications */
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid;
+            font-size: 0.8rem;
+            min-width: 300px;
+            max-width: 420px;
+            backdrop-filter: blur(12px);
+            animation: toastIn 0.3s ease-out;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .toast-success {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .toast-error {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .toast-warning {
+            background: rgba(249, 115, 22, 0.15);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
+        }
+
+        .toast-info {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 1.1rem;
+            cursor: pointer;
+            opacity: 0.6;
+            padding: 0 0.25rem;
+            line-height: 1;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes toastIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes toastOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
     </style>
 </head>
 
 <body class="h-screen flex flex-col font-sans text-sm bg-bgPrimary text-textPrimary overflow-hidden">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-14 right-4 flex flex-col gap-2" style="z-index: 9999; pointer-events: none;">
+    </div>
 
     <!-- TITLE BAR (Draggable) -->
     <div
@@ -665,23 +734,63 @@
                         class="bg-bgCard border border-borderSubtle rounded-xl hover:bg-bgCardHover hover:border-textDim transition-all col-span-2 p-6 flex flex-col gap-5">
                         <h3 class="text-xs font-semibold tracking-wider text-textDim uppercase">TOOL PATHS</h3>
 
-                        <div class="flex flex-col gap-1">
+                        <!-- Hashcat -->
+                        <div class="flex flex-col gap-2">
                             <label class="text-xs text-textDim">Hashcat Folder</label>
                             <div class="flex gap-2">
                                 <input type="text" id="set-hc-path" readonly
                                     class="flex-1 bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm text-textDim">
                                 <button onclick="browseFolder('hc')"
                                     class="px-4 py-2 bg-bgCard border border-borderSubtle hover:border-textDim rounded-lg text-sm font-medium transition-colors">Browse</button>
+                                <button onclick="downloadTool('hashcat')" id="btn-dl-hashcat"
+                                    class="px-4 py-2 bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
+                                        </path>
+                                    </svg>
+                                    Download
+                                </button>
+                            </div>
+                            <div id="dl-progress-hashcat" class="hidden">
+                                <div class="w-full bg-bgPrimary rounded-full h-1.5 overflow-hidden">
+                                    <div id="dl-bar-hashcat" class="bg-accent h-full transition-all duration-300"
+                                        style="width: 0%"></div>
+                                </div>
+                                <div class="flex justify-between items-center mt-1">
+                                    <span id="dl-status-hashcat" class="text-xs text-textDim">Preparing download...</span>
+                                    <button onclick="cancelDownload('hashcat')" class="text-xs text-red-500 hover:text-red-400 font-medium">Cancel</button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="flex flex-col gap-1">
+                        <!-- John the Ripper -->
+                        <div class="flex flex-col gap-2">
                             <label class="text-xs text-textDim">John the Ripper Folder (*2john)</label>
                             <div class="flex gap-2">
                                 <input type="text" id="set-jtr-path" readonly
                                     class="flex-1 bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm text-textDim">
                                 <button onclick="browseFolder('jtr')"
                                     class="px-4 py-2 bg-bgCard border border-borderSubtle hover:border-textDim rounded-lg text-sm font-medium transition-colors">Browse</button>
+                                <button onclick="downloadTool('jtr')" id="btn-dl-jtr"
+                                    class="px-4 py-2 bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
+                                        </path>
+                                    </svg>
+                                    Download
+                                </button>
+                            </div>
+                            <div id="dl-progress-jtr" class="hidden">
+                                <div class="w-full bg-bgPrimary rounded-full h-1.5 overflow-hidden">
+                                    <div id="dl-bar-jtr" class="bg-accent h-full transition-all duration-300"
+                                        style="width: 0%"></div>
+                                </div>
+                                <div class="flex justify-between items-center mt-1">
+                                    <span id="dl-status-jtr" class="text-xs text-textDim">Preparing download...</span>
+                                    <button onclick="cancelDownload('jtr')" class="text-xs text-red-500 hover:text-red-400 font-medium">Cancel</button>
+                                </div>
                             </div>
                         </div>
                     </div>

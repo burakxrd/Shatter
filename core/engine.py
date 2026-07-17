@@ -21,6 +21,7 @@ from typing import Any
 import psutil
 
 from core.cap_parser import cap_to_hc22000_string
+from core import TEMP_DIR
 
 
 # ──────────────────────────────────────────────
@@ -28,8 +29,7 @@ from core.cap_parser import cap_to_hc22000_string
 # ──────────────────────────────────────────────
 log = logging.getLogger(__name__)
 
-APP_DIR = Path(__file__).resolve().parent.parent
-TARGET_HASH_FILE = APP_DIR / "temp" / "target_hash.txt"
+TARGET_HASH_FILE = TEMP_DIR / "target_hash.txt"
 
 # Mapping: file extension -> (extractor tool, extra args)
 HASH_EXTRACTORS: dict[str, tuple[str, list[str]]] = {
@@ -481,7 +481,6 @@ class HashcatEngine:
         # Build command
         cmd = self._build_hashcat_cmd(m_value, settings)
 
-        on_output(f"[*] Command: {' '.join(cmd)}\n")
         on_output("─" * 60 + "\n")
 
         # Use CREATE_NEW_PROCESS_GROUP on Windows so we can send CTRL_BREAK for checkpoint
@@ -540,7 +539,6 @@ class HashcatEngine:
         cmd = [str(self._get_hashcat_exe()), "-b", "-m", "0", "-m", "1000", "-d", device_id]
 
         on_output(f"[*] Benchmarking Device ID: {device_id}\n")
-        on_output(f"[*] Command: {' '.join(cmd)}\n")
         on_output("─" * 60 + "\n")
 
         rc = self._stream_process(cmd, cwd=self._get_hashcat_cwd(), on_output=on_output, on_done=lambda: None)
@@ -567,7 +565,6 @@ class HashcatEngine:
                "--status", "--status-timer=2"]
 
         on_output(f"[*] Restoring session: {session_name}\n")
-        on_output(f"[*] Command: {' '.join(cmd)}\n")
         on_output("─" * 60 + "\n")
 
         cflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0

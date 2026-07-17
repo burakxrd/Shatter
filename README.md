@@ -1,23 +1,45 @@
-# ⚡ Shatter — Advanced Hash Cracker
+<p align="center">
+  <img src="Shatter.png" alt="Shatter Logo" width="120">
+</p>
 
-> **Hashcat & John the Ripper, tek bir modern arayüzde.**
-> Hash yapıştır → otomatik algıla → tek tuşla kır.
+<h1 align="center">Shatter</h1>
 
-Shatter, penetrasyon test uzmanları ve siber güvenlik araştırmacıları için geliştirilmiş, **Python + CustomTkinter** tabanlı bir masaüstü hash kırma platformudur. Sadece bir "GUI wrapper" değildir — otomatik hash algılama, şifreli dosyalardan hash çıkarımı, native PCAP parsing ve akıllı süreç yönetimi gibi özelliklerle CLI araçlarının üzerine gerçek bir zeka katmanı ekler.
+<p align="center">
+  <strong>Advanced Hash Cracking Platform</strong><br>
+  <em>Hashcat & John the Ripper, unified under a single modern interface.</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776ab?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/Platform-Windows-0078d4?logo=windows&logoColor=white" alt="Platform">
+  <img src="https://img.shields.io/badge/UI-pywebview-orange" alt="UI">
+</p>
 
 ---
 
-## ✨ Özellikler
+<!-- TODO: Add demo GIF/video here -->
+<!-- https://github.com/user-attachments/assets/xxx -->
 
-### 🔍 Otomatik Hash Algılama
-- **name-that-hash** kütüphanesi ile 300+ hash tipini tanır (MD5, NTLM, SHA-256, bcrypt, vb.)
-- NTH'nin kaçırdığı hash'ler için **30+ Hashcat-specific regex pattern**: WPA/WPA2 PMKID, PKZIP, RAR3/5, 7-Zip, PDF, MS Office, KeePass, BitLocker, VeraCrypt, Kerberos 5 (TGS/AS-REP), NetNTLMv1/v2, MSSQL, PostgreSQL, LDAP, Cisco ve daha fazlası
-- Hash yapıştırıldığı anda debounce ile (300ms) anlık tespit ve Hashcat modu (`-m`) otomatik eşleme
+## What is Shatter?
 
-### 📎 Şifreli Dosya Desteği
-Aşağıdaki formatlardan `*2john` araçlarıyla otomatik hash çıkarımı:
+Shatter is a desktop hash cracking platform built with **Python + pywebview**, designed for penetration testers and security researchers. It's not just a GUI wrapper — it adds a real intelligence layer on top of CLI tools with automatic hash detection, encrypted file extraction, native PCAP parsing, and smart process management.
 
-| Format | Araç |
+**Paste a hash → auto-detect → crack with one click.**
+
+---
+
+## ✨ Features
+
+### 🔍 Automatic Hash Detection
+- Identifies **300+ hash types** via [name-that-hash](https://github.com/HashPals/Name-That-Hash) (MD5, NTLM, SHA-256, bcrypt, etc.)
+- **30+ Hashcat-specific regex patterns** for hashes NTH misses: WPA/WPA2 PMKID, PKZIP, RAR3/5, 7-Zip, PDF, MS Office, KeePass, BitLocker, VeraCrypt, Kerberos 5, NetNTLMv1/v2, and more
+- Instant detection with **300ms debounce** as you type, with automatic Hashcat mode (`-m`) mapping
+
+### 📎 Encrypted File Support
+Automatic hash extraction from encrypted files using `*2john` tools:
+
+| Format | Tool |
 |--------|------|
 | `.zip` | zip2john |
 | `.rar` | rar2john |
@@ -29,153 +51,145 @@ Aşağıdaki formatlardan `*2john` araçlarıyla otomatik hash çıkarımı:
 | `.gpg` | gpg2john |
 | `.pfx` | pfx2john |
 
-### 📡 Native PCAP Parser (Scapy)
-`.cap`, `.pcap` ve `.pcapng` dosyaları için harici araç gerektirmeyen **yerleşik WPA/WPA2 handshake parser:**
-- Scapy ile 802.11 paketlerini okur
-- Beacon/Probe Response'lardan ESSID çıkarır
-- EAPOL 4-way handshake'i (Message 1-4) parse eder
-- Sonucu doğrudan **hashcat mode 22000** (`WPA*02*...`) formatında üretir
-- Npcap/WinPcap UAC prompt'larını tetiklememek için **lazy import** kullanır
+### 📡 Native PCAP Parser
+Built-in WPA/WPA2 handshake parser for `.cap`, `.pcap`, and `.pcapng` files — no external tools needed:
+- Reads 802.11 packets with Scapy
+- Extracts ESSID from Beacon/Probe Response frames
+- Parses EAPOL 4-way handshake (Messages 1-4)
+- Outputs directly in **hashcat mode 22000** (`WPA*02*...`) format
+- Uses **lazy import** to avoid triggering Npcap/WinPcap UAC prompts
 
-### ⚡ 5 Saldırı Modu
-| Mod | Açıklama |
-|-----|----------|
-| `0` | Wordlist (klasik sözlük saldırısı) |
-| `1` | Combinator (iki wordlist birleştirme) |
+### ⚡ 5 Attack Modes
+| Mode | Description |
+|------|-------------|
+| `0` | Wordlist (classic dictionary attack) |
+| `1` | Combinator (two wordlists combined) |
 | `3` | Mask / Brute-force (`?a?a?a?a?d?d`) |
 | `6` | Hybrid: Wordlist + Mask |
 | `7` | Hybrid: Mask + Wordlist |
 
-- **Multi-Rule Stacking:** Birden fazla `.rule` dosyasını üst üste uygulama
-- **Custom Charset:** 4 adet kullanıcı tanımlı karakter seti (`-1`, `-2`, `-3`, `-4`)
-- **Skip / Limit:** Keyspace bölme (dağıtık cracking temeli)
+- **Multi-Rule Stacking:** Apply multiple `.rule` files
+- **Custom Charsets:** 4 user-defined character sets (`-1` to `-4`)
+- **Skip / Limit:** Keyspace splitting for distributed cracking
 
-### 🎮 Süreç Yönetimi
-- **Pause / Resume:** `psutil` ile hashcat sürecini dondurma ve devam ettirme
-- **Checkpoint (Kaydet & Çık):** `CTRL_BREAK` sinyali ile hashcat'in `.restore` dosyası oluşturmasını sağlar
-- **Restore:** Kaydedilmiş session'ı tek tuşla kaldığı yerden devam ettirir
-- **Kill:** Anında durdurma
-- **Canlı Progress Bar + ETA:** Hashcat `--status` çıktısından regex ile parse
+### 🎮 Process Management
+- **Pause / Resume:** Freeze and unfreeze the hashcat process via `psutil`
+- **Checkpoint (Save & Exit):** `CTRL_BREAK` signal for hashcat's `.restore` file
+- **Restore:** Resume a saved session with one click
+- **Kill:** Instant termination
+- **Live Progress Bar + ETA:** Parsed from hashcat `--status` output
 
 ### 📋 Potfile Viewer
-- `hashcat.potfile` dosyasını parse edip kırılmış hash:password çiftlerini tabloda gösterir
-- **Debounced arama** (350ms) — hash veya şifrede anlık filtreleme
-- **Sayfalama (Pagination):** 200'er satırlık sayfalar ile büyük potfile'larda bile akıcı performans
-- Tek tıkla panoya kopyalama
-- Potfile temizleme (onaylı silme)
+- Parses `hashcat.potfile` and displays cracked hash:password pairs in a searchable table
+- One-click copy to clipboard
+- Potfile clearing with confirmation
 
-### 🔧 Araç Yolu Keşfi
-- İlk çalışmada Hashcat ve JtR'yi **otomatik bulur:** yaygın Windows konumları + PATH + kullanıcı dizini
-- Bulamazsa UI'dan seçtirtir, sonra config'e kayıt — bir daha sormaz
-- `hashcat --version` ile doğrulama, `zip2john` varlığı ile JtR validasyonu
-
-### ⏱️ Benchmark
-Seçili GPU cihazında MD5 ve NTLM benchmark'ı çalıştırır — hızı terminalde gösterir.
+### 🔧 Automatic Tool Discovery
+- Auto-discovers Hashcat and JtR on first run: common Windows paths + PATH + user directories
+- Falls back to manual selection via UI, then saves to config — never asks again
+- Validates with `hashcat --version` and `zip2john` presence checks
 
 ---
 
-## 🏗️ Mimari
+## 🏗️ Architecture
 
 ```
 Shatter/
-├── shatter.pyw          # Ana giriş noktası (ShatterApp — Mixin tabanlı)
+├── shatter.pyw          # Entry point (pywebview window)
 ├── core/
-│   ├── engine.py        # Hashcat süreç yönetimi, hash çıkarma, crack/benchmark/restore
-│   ├── detector.py      # Hash tipi algılama (NTH + regex fallback)
-│   ├── cap_parser.py    # Scapy tabanlı .cap → hc22000 dönüştürücü
-│   ├── tool_paths.py    # Hashcat & JtR otomatik keşif ve validasyon
-│   └── log_config.py    # Logging yapılandırması
+│   ├── engine.py        # Hashcat process lifecycle, hash extraction, crack/benchmark/restore
+│   ├── detector.py      # Hash type detection (NTH + regex fallback)
+│   ├── cap_parser.py    # Scapy-based .cap → hc22000 converter
+│   ├── tool_paths.py    # Hashcat & JtR auto-discovery and validation
+│   └── log_config.py    # Logging configuration (rotating file + console)
 ├── ui/
-│   ├── dashboard.py     # Dashboard tab (hash input, wordlist, crack button, progress)
-│   ├── handlers.py      # Tüm event handler'lar (crack, restore, benchmark, pause, vb.)
-│   ├── settings.py      # General & Advanced sekmesi (attack mode, workload, charset, vb.)
-│   ├── potfile.py       # Potfile Manager tab (arama, sayfalama, kopyalama)
-│   └── theme.py         # Renk paleti, fontlar, UI sabitleri
-├── kernels/             # (Planlanan: özel hashcat kernel'ları)
-├── tests/
-│   ├── test_detector.py # Hash algılama unit testleri
-│   ├── test_engine.py   # Engine unit testleri
-│   ├── test_handlers.py # UI handler testleri
-│   └── test_potfile.py  # Potfile parser testleri
-└── temp/                # Geçici hash dosyaları, config.json
+│   ├── api.py           # Python ↔ JS bridge (pywebview js_api)
+│   └── web/             # Frontend (HTML + Tailwind CSS + vanilla JS)
+├── tests/               # pytest test suite
+└── temp/                # Runtime config, hash files, logs
 ```
 
-**Tasarım kararları:**
-- **Mixin Pattern:** `ShatterApp`, `DashboardMixin`, `SettingsMixin`, `PotfileMixin` ve `HandlersMixin`'den türer — tek bir monolitik dosya yerine sorumluluk ayrımı
-- **Threaded Execution:** Crack, benchmark ve restore işlemleri `threading.Thread(daemon=True)` ile arka planda çalışır, UI asla bloke olmaz
-- **Lazy Import:** Scapy ve name-that-hash gibi ağır kütüphaneler sadece ihtiyaç duyulduğunda yüklenir
+**Key design decisions:**
+- **pywebview + HTML/JS Frontend:** Native-feeling desktop app with a modern web UI
+- **Structured Event Parsing:** Raw hashcat output is parsed into typed events (progress, speed, cracked, etc.) and dispatched to the frontend
+- **Threaded Execution:** Crack, benchmark, and restore run in `daemon=True` threads — UI never blocks
+- **Lazy Imports:** Heavy libraries (Scapy, name-that-hash) are loaded only when needed
 
 ---
 
-## 🚀 Kurulum
+## 🚀 Quick Start
 
-### Gereksinimler
+### Prerequisites
 - **Python 3.11+**
-- **Hashcat** (Sisteminizde yoksa uygulama içinden yolunu belirtebilirsiniz)
-- **John the Ripper** (Opsiyonel — şifreli dosyalardan hash çıkarmak için `*2john` araçları)
+- **Hashcat** (path can be configured in-app if not in PATH)
+- **John the Ripper** (optional — for `*2john` encrypted file extraction)
 
-### Adımlar
+### Installation
 
 ```bash
-# 1. Repo'yu klonla
+# Clone the repository
 git clone https://github.com/burakxrd/Shatter.git
 cd Shatter
 
-# 2. Bağımlılıkları kur
+# Install dependencies
 pip install -r requirements.txt
 
-# 3. Çalıştır
+# Launch
 python shatter.pyw
 ```
 
-> **Not:** İlk açılışta Hashcat bulunamazsa, uygulama seni General sekmesindeki "Tool Paths" bölümüne yönlendirir. Windows kullanıcıları için ileride tek tıklamalı `.exe` sürümü de eklenecektir.
+> **Note:** On first launch, if Hashcat isn't found automatically, you'll be prompted to set the path in Settings → Tool Paths.
 
 ---
 
-## 📸 Kullanım
+## 📸 Usage
 
-1. **Hash yapıştır** → Algoritma otomatik algılanır
-2. **Wordlist seç** veya **Mask yaz** (saldırı moduna göre)
-3. **⚡ CRACK** butonuna bas
-4. Terminalde canlı çıktı, progress bar'da ilerleme izle
-5. Sonuç potfile'a yazılır → Potfile sekmesinden görebilirsin
+1. **Paste a hash** → Algorithm is auto-detected
+2. **Select a wordlist** or **enter a mask** (depending on attack mode)
+3. **Hit ⚡ CRACK**
+4. Watch live output in the Event Log, track progress on the progress bar
+5. Results are saved to the potfile → view them in the Activity tab
 
-**Şifreli dosya:** `📎 Extract` butonuyla `.zip`, `.rar`, `.pdf`, `.cap` vb. dosyalardan hash çıkar → otomatik algıla → kır.
-
----
-
-## 🗺️ Yol Haritası (Roadmap)
-
-Şu anki hedeflerimiz, Shatter'ı daha kararlı, kolay dağıtılabilir ve günlük pentest süreçlerinde daha kullanışlı hale getirmektir.
-
-- [ ] 📦 **Kolay Kurulum & Dağıtım** — Kullanıcıların Python bağımlılıklarıyla uğraşmaması için `PyInstaller` ile tek tıklamalı `.exe` derlemesi.
-- [ ] 📥 **Otomatik Araç İndirme** — Sistemde Hashcat veya JtR bulunamazsa, kullanıcı onayıyla arka planda en güncel sürümlerini indirip kurma.
-- [ ] 📄 **Raporlama (Export)** — Kırılan şifreleri ve oturum istatistiklerini CSV veya HTML formatında dışa aktarma yeteneği.
-- [ ] 📂 **Sürükle & Bırak (Drag & Drop)** — `.cap`, `.txt` veya wordlist dosyalarını doğrudan uygulamanın üzerine sürükleyerek hızlıca işleme alma.
-- [ ] 🌐 **Arayüz İyileştirmeleri** — Kullanıcı deneyimini artıracak ufak animasyonlar, hata mesajlarının daha belirgin hale getirilmesi.
+**Encrypted files:** Use the `📎 Extract from File` button to pull hashes from `.zip`, `.rar`, `.pdf`, `.cap` and more → auto-detect → crack.
 
 ---
 
-## 🆚 Neden Shatter?
+## 🗺️ Roadmap
 
-| Özellik | hashcat-gui | Hashtopolis | CrackQ | **Shatter** |
+- [x] 📦 **Easy Distribution** — Single-click `.exe` via PyInstaller
+- [x] 📥 **Auto Tool Download** — Download Hashcat/JtR automatically if not found
+- [x] 🌐 **UI Polish** — Animations, better error feedback, toast notifications
+- [ ] 📄 **Reporting** — Export cracked passwords and session stats as CSV/HTML
+- [ ] 📂 **Drag & Drop** — Drop `.cap`, wordlists, or hash files directly onto the app
+
+---
+
+## 🆚 Why Shatter?
+
+| Feature | hashcat-gui | Hashtopolis | CrackQ | **Shatter** |
 |---------|:-----------:|:-----------:|:------:|:-----------:|
-| Otomatik Hash Algılama | ❌ | ❌ | ❌ | ✅ 300+ tip |
-| Şifreli Dosya Desteği | ❌ | ❌ | ❌ | ✅ 12 format |
+| Auto Hash Detection | ❌ | ❌ | ❌ | ✅ 300+ types |
+| Encrypted File Support | ❌ | ❌ | ❌ | ✅ 12 formats |
 | Native PCAP Parser | ❌ | ❌ | ❌ | ✅ Scapy |
 | Pause / Resume / Checkpoint | ❌ | ⚠️ | ⚠️ | ✅ |
-| Potfile Viewer | ❌ | ⚠️ | ❌ | ✅ Aranabilir |
-| Kurulum | Kolay | Cehennem | Docker | `pip install` |
-| Aktif Geliştirme | ❌ | ⚠️ | ❌ | ✅ |
+| Potfile Viewer | ❌ | ⚠️ | ❌ | ✅ Searchable |
+| Setup Difficulty | Easy | Complex | Docker | `pip install` |
+| Active Development | ❌ | ⚠️ | ❌ | ✅ |
 
 ---
 
-## 🛡️ Yasal Uyarı
+## 🤝 Contributing
 
-Bu araç **yalnızca yasal ve yetkili güvenlik testleri** için tasarlanmıştır. Yetkisiz sistemlere karşı kullanılması yasalara aykırıdır. Kullanıcı, aracın kullanımından doğan tüm sorumlulukları kabul eder.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## 📄 Lisans
+## 🛡️ Legal Disclaimer
 
-MIT License — Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+This tool is intended **solely for authorized security testing and research**. Unauthorized use against systems you do not own or have explicit permission to test is illegal. The user assumes full responsibility for how this tool is used.
+
+---
+
+## 📄 License
+
+[MIT License](LICENSE) — see the LICENSE file for details.

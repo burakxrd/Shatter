@@ -2,3 +2,4 @@ pywebview
 psutil
 name-that-hash
 scapy
+py7zr

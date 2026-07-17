@@ -27,3 +27,26 @@ johntheripper/
 # Misc
 *.resolved
 kernels/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+*.spec.bak
+
+# Environment
+.env
+.venv/
+venv/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Agents
+.agents/
+
+# Ignored Folders
+graphify-out/
+.github/
+tests/

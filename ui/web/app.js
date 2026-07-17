@@ -296,7 +296,7 @@ class HashcatBridge {
             // Standard envelope: { success, data, error }
             if (res && typeof res.success !== 'undefined') {
                 if (!res.success) {
-                    if (res.error) alert(res.error);
+                    if (res.error) showToast(res.error, 'error');
                     return null;
                 }
                 return res.data;
@@ -305,7 +305,7 @@ class HashcatBridge {
             return res;
         } catch (e) {
             console.error(`API call failed: ${method}`, e);
-            alert(`API Error: ${e.message || e}`);
+            showToast(`API Error: ${e.message || e}`, 'error');
             return null;
         }
     }
@@ -330,6 +330,9 @@ class HashcatBridge {
     clearPotfile() { return this._call('clear_potfile'); }
     getWindowSize() { return this._call('get_window_size'); }
     resize(w, h) { return this._call('resize', w, h); }
+    downloadHashcat() { return this._call('download_hashcat'); }
+    downloadJtr() { return this._call('download_jtr'); }
+    cancelDownload() { return this._call('cancel_download'); }
 }
 
 // ═══════════════════════════════════════════════
@@ -416,10 +419,14 @@ class SettingsStore {
         if (cfg.hc_path) {
             this.hcPath = cfg.hc_path;
             document.getElementById('set-hc-path').value = this.hcPath;
+            const hcBtn = document.getElementById('btn-dl-hashcat');
+            if (hcBtn) hcBtn.innerHTML = hcBtn.innerHTML.replace('Download', 'Reinstall');
         }
         if (cfg.jtr_path) {
             this.jtrPath = cfg.jtr_path;
             document.getElementById('set-jtr-path').value = this.jtrPath;
+            const jtrBtn = document.getElementById('btn-dl-jtr');
+            if (jtrBtn) jtrBtn.innerHTML = jtrBtn.innerHTML.replace('Download', 'Reinstall');
         }
 
         return cfg;
@@ -469,6 +476,150 @@ window.onHashcatEvent = function (event) {
 
 window.clearHashcatOutput = function () {
     terminal.clear();
+};
+
+// ── Toast Notifications ──
+
+function showToast(message, type = 'info', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.pointerEvents = 'auto';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = icons[type] || 'ℹ️';
+
+    const msgSpan = document.createElement('span');
+    msgSpan.style.flex = '1';
+    msgSpan.textContent = message;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.textContent = '×';
+    closeBtn.onclick = () => toast.remove();
+
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
+    toast.appendChild(closeBtn);
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'toastOut 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+function showConfirm(message, onConfirm) {
+    // Remove any existing modal
+    const existing = document.getElementById('confirm-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'confirm-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(4px);';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:#171717;border:1px solid rgba(255,255,255,0.1);border-radius:0.75rem;padding:1.5rem;min-width:340px;max-width:420px;box-shadow:0 25px 50px rgba(0,0,0,0.5);';
+
+    const icon = document.createElement('div');
+    icon.style.cssText = 'font-size:1.5rem;margin-bottom:0.75rem;';
+    icon.textContent = '\u26A0\uFE0F';
+
+    const msg = document.createElement('p');
+    msg.style.cssText = 'color:#e2e8f0;font-size:0.875rem;margin-bottom:1.25rem;line-height:1.5;';
+    msg.textContent = message;
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:0.75rem;justify-content:flex-end;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = 'padding:0.5rem 1.25rem;border-radius:0.5rem;font-size:0.8rem;font-weight:500;background:#262626;border:1px solid rgba(255,255,255,0.1);color:#a1a1aa;cursor:pointer;transition:all 0.15s;';
+    cancelBtn.onmouseenter = () => { cancelBtn.style.borderColor = '#737373'; cancelBtn.style.color = '#e2e8f0'; };
+    cancelBtn.onmouseleave = () => { cancelBtn.style.borderColor = 'rgba(255,255,255,0.1)'; cancelBtn.style.color = '#a1a1aa'; };
+    cancelBtn.onclick = () => overlay.remove();
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.style.cssText = 'padding:0.5rem 1.25rem;border-radius:0.5rem;font-size:0.8rem;font-weight:600;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.5);color:#ef4444;cursor:pointer;transition:all 0.15s;';
+    confirmBtn.onmouseenter = () => { confirmBtn.style.background = 'rgba(239,68,68,0.3)'; };
+    confirmBtn.onmouseleave = () => { confirmBtn.style.background = 'rgba(239,68,68,0.2)'; };
+    confirmBtn.onclick = () => { overlay.remove(); onConfirm(); };
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    modal.appendChild(icon);
+    modal.appendChild(msg);
+    modal.appendChild(btnRow);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click (outside modal)
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    // Close on Escape
+    const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+}
+
+// ── Download Callbacks (called from Python backend) ──
+
+window.onDownloadProgress = function (tool, percent, downloaded, total) {
+    const bar = document.getElementById(`dl-bar-${tool}`);
+    const status = document.getElementById(`dl-status-${tool}`);
+    const container = document.getElementById(`dl-progress-${tool}`);
+
+    if (container) container.classList.remove('hidden');
+    if (bar) bar.style.width = `${percent}%`;
+
+    if (status) {
+        const dlMB = (downloaded / 1024 / 1024).toFixed(1);
+        const totalMB = (total / 1024 / 1024).toFixed(1);
+        status.textContent = `Downloading... ${dlMB} / ${totalMB} MB (${percent}%)`;
+    }
+};
+
+window.onDownloadDone = function (tool, success, detail) {
+    const container = document.getElementById(`dl-progress-${tool}`);
+    const btn = document.getElementById(`btn-dl-${tool}`);
+
+    if (btn) {
+        btn.disabled = false;
+        if (btn.dataset.originalHtml) {
+            btn.innerHTML = btn.dataset.originalHtml;
+            delete btn.dataset.originalHtml;
+        }
+    }
+
+    if (success) {
+        if (tool === 'hashcat') {
+            store.hcPath = detail;
+            document.getElementById('set-hc-path').value = detail;
+            loadDevices();
+            if (btn) btn.innerHTML = btn.innerHTML.replace('Download', 'Reinstall');
+        } else {
+            store.jtrPath = detail;
+            document.getElementById('set-jtr-path').value = detail;
+            if (btn) btn.innerHTML = btn.innerHTML.replace('Download', 'Reinstall');
+        }
+        store.save();
+        showToast(`${tool === 'hashcat' ? 'Hashcat' : 'John the Ripper'} installed successfully!`, 'success', 5000);
+        if (container) container.classList.add('hidden');
+    } else {
+        if (detail === 'Download cancelled.') {
+            if (container) container.classList.add('hidden');
+            return;
+        }
+        showToast(`Download failed: ${detail}`, 'error', 6000);
+        if (container) {
+            const status = document.getElementById(`dl-status-${tool}`);
+            if (status) {
+                status.textContent = 'Download failed. Check your internet connection.';
+                status.style.color = '#ef4444';
+            }
+        }
+    }
 };
 
 // ── Navigation ──
@@ -704,13 +855,13 @@ window.onCrackDone = async function () {
 
 async function startCrack() {
     if (!store.hcPath) {
-        alert("Hashcat path not set! Please go to Settings.");
+        showToast('Hashcat path not set! Please configure it in Settings.', 'warning');
         nav('settings');
         return;
     }
     const settings = store.getSettingsObject();
     if (!settings.hash && !settings.hash_file_path) {
-        alert("Please provide a target hash or hash file.");
+        showToast('Please provide a target hash or hash file.', 'warning');
         return;
     }
 
@@ -730,7 +881,7 @@ async function startCrack() {
 async function restoreCrack() {
     const session = document.getElementById('set-session').value.trim();
     if (!session) {
-        alert("Please set a Session Name in settings to restore.");
+        showToast('Please set a Session Name in settings to restore.', 'warning');
         return;
     }
     isCracking = true;
@@ -787,6 +938,25 @@ async function browseFolder(type) {
     }
 }
 
+async function downloadTool(tool) {
+    const btn = document.getElementById(`btn-dl-${tool}`);
+    setButtonLoading(btn, true);
+
+    if (tool === 'hashcat') {
+        await bridge.downloadHashcat();
+    } else {
+        await bridge.downloadJtr();
+    }
+    // Button stays in loading state until onDownloadDone callback fires
+}
+
+async function cancelDownload(tool) {
+    const btn = document.getElementById(`btn-dl-${tool}`);
+    const status = document.getElementById(`dl-status-${tool}`);
+    if (status) status.textContent = 'Cancelling...';
+    await bridge.cancelDownload();
+}
+
 // ── Potfile ──
 
 async function refreshPotfile() {
@@ -832,10 +1002,11 @@ async function refreshPotfile() {
 }
 
 async function clearPotfile() {
-    if (confirm('Are you sure you want to clear the potfile? This cannot be undone.')) {
+    showConfirm('Are you sure you want to clear the potfile? This cannot be undone.', async () => {
         await bridge.clearPotfile();
         refreshPotfile();
-    }
+        showToast('Potfile cleared.', 'success');
+    });
 }
 
 // ── Terminal Shortcuts ──
@@ -886,6 +1057,14 @@ window.addEventListener('pywebviewready', async function () {
     }
 
     store.attachAutoSave();
+
+    // Auto-redirect to settings if Hashcat not configured
+    if (!store.hcPath) {
+        setTimeout(() => {
+            nav('settings');
+            showToast('Welcome to Shatter! Please configure Hashcat to get started.', 'warning', 6000);
+        }, 300);
+    }
 });
 
 // ── Window Resizing ──

@@ -9,6 +9,7 @@ This allows the JS frontend to use a single error-handling path.
 
 import json
 import logging
+import re as _re
 import threading
 
 from pathlib import Path
@@ -16,7 +17,7 @@ import webview
 
 from core.engine import HashcatEngine
 from core.detector import detect_hash_type
-from core import TEMP_DIR
+from core import APP_ROOT, TEMP_DIR
 import core.tool_paths as tool_paths
 
 log = logging.getLogger(__name__)
@@ -40,8 +41,6 @@ def _err(message: str) -> dict:
 # ──────────────────────────────────────────────
 #  Hashcat Output → Structured Event Parser
 # ──────────────────────────────────────────────
-
-import re as _re
 
 _NOISE_PREFIXES = (
     "Minimum password", "Maximum password",
@@ -216,6 +215,8 @@ def _parse_hashcat_line(line: str) -> dict | None:
 class Api:
     def __init__(self):
         self._window: webview.Window | None = None
+        self._downloading = False
+        self._cancel_download = threading.Event()
         self._engine = HashcatEngine(
             hashcat_exe=tool_paths.hashcat_exe,
             hashcat_dir=tool_paths.hashcat_dir,
@@ -407,6 +408,112 @@ class Api:
 
         self._sync_engine_paths()
         return _ok()
+
+    # ── Tool Downloads ──
+
+    def download_hashcat(self) -> dict:
+        """Start downloading hashcat from GitHub in a background thread."""
+        if self._downloading:
+            return _err("A download is already in progress.")
+        self._downloading = True
+        self._cancel_download.clear()
+
+        def _do():
+            try:
+                from core.downloader import download_hashcat as dl_hashcat
+                dest = APP_ROOT / "hashcat"
+
+                def on_progress(downloaded, total):
+                    if self._window and total > 0:
+                        pct = round(downloaded / total * 100, 1)
+                        self._window.evaluate_js(
+                            f"onDownloadProgress('hashcat', {pct}, {downloaded}, {total})"
+                        )
+
+                hc_dir = dl_hashcat(dest, on_progress, self._cancel_download.is_set)
+
+                # Auto-configure paths
+                tool_paths.set_hashcat_dir(str(hc_dir))
+                self._sync_engine_paths()
+
+                if self._window:
+                    safe_path = json.dumps(str(hc_dir))
+                    self._window.evaluate_js(
+                        f"onDownloadDone('hashcat', true, {safe_path})"
+                    )
+            except InterruptedError:
+                log.info("Hashcat download cancelled by user.")
+                if self._window:
+                    self._window.evaluate_js(
+                        "onDownloadDone('hashcat', false, 'Download cancelled.')"
+                    )
+            except Exception as e:
+                log.exception("Hashcat download failed")
+                if self._window:
+                    safe_err = json.dumps(str(e))
+                    self._window.evaluate_js(
+                        f"onDownloadDone('hashcat', false, {safe_err})"
+                    )
+            finally:
+                self._downloading = False
+
+        threading.Thread(target=_do, daemon=True).start()
+        return _ok({"status": "downloading"})
+
+    def download_jtr(self) -> dict:
+        """Start downloading John the Ripper from GitHub in a background thread."""
+        if self._downloading:
+            return _err("A download is already in progress.")
+        self._downloading = True
+        self._cancel_download.clear()
+
+        def _do():
+            try:
+                from core.downloader import download_jtr as dl_jtr
+                dest = APP_ROOT / "johntheripper"
+
+                def on_progress(downloaded, total):
+                    if self._window and total > 0:
+                        pct = round(downloaded / total * 100, 1)
+                        self._window.evaluate_js(
+                            f"onDownloadProgress('jtr', {pct}, {downloaded}, {total})"
+                        )
+
+                jtr_dir = dl_jtr(dest, on_progress, self._cancel_download.is_set)
+
+                # Auto-configure paths
+                tool_paths.set_jtr_dir(str(jtr_dir))
+                self._sync_engine_paths()
+
+                if self._window:
+                    safe_path = json.dumps(str(jtr_dir))
+                    self._window.evaluate_js(
+                        f"onDownloadDone('jtr', true, {safe_path})"
+                    )
+            except InterruptedError:
+                log.info("JtR download cancelled by user.")
+                if self._window:
+                    self._window.evaluate_js(
+                        "onDownloadDone('jtr', false, 'Download cancelled.')"
+                    )
+            except Exception as e:
+                log.exception("JtR download failed")
+                if self._window:
+                    safe_err = json.dumps(str(e))
+                    self._window.evaluate_js(
+                        f"onDownloadDone('jtr', false, {safe_err})"
+                    )
+            finally:
+                self._downloading = False
+
+        threading.Thread(target=_do, daemon=True).start()
+        return _ok({"status": "downloading"})
+
+    def cancel_download(self) -> dict:
+        """Cancel an in-progress download."""
+        self._cancel_download.set()
+        return _ok()
+
 
     # ── Potfile ──
 

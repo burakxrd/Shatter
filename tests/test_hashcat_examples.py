@@ -1,5 +1,4 @@
 import sys
-import subprocess
 import re
 from pathlib import Path
 
@@ -19,7 +18,6 @@ def get_hashcat_examples():
 
     examples = []
     current_mode = None
-    current_hash = None
     
     for line in lines:
         line = line.strip()
@@ -35,7 +33,6 @@ def get_hashcat_examples():
                 if current_mode and hash_val:
                     examples.append((current_mode, hash_val))
                     current_mode = None
-                    current_hash = None
                 
     return examples
 

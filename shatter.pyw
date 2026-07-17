@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 import webview
 
+from core import BUNDLE_DIR
 from core.log_config import setup_logging
 from ui.api import Api
 
@@ -21,7 +22,7 @@ def main() -> None:
     api = Api()
 
     # Create frameless pywebview window
-    html_path = str(Path(__file__).parent / "ui" / "web" / "index.html")
+    html_path = str(BUNDLE_DIR / "ui" / "web" / "index.html")
     
     width = 1100
     height = 750
