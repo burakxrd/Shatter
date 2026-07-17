@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Shatter.png" alt="Shatter Logo" width="120">
+  <img src="assets/Shatter.png" alt="Shatter Logo" width="120">
 </p>
 
 <h1 align="center">Shatter</h1>

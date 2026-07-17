@@ -22,7 +22,7 @@ a = Analysis(
         # Web UI assets (HTML, CSS, JS, fonts, images)
         (str(ROOT / 'ui' / 'web'), 'ui/web'),
         # App icon / logo
-        (str(ROOT / 'Shatter.png'), '.'),
+        (str(ROOT / 'assets' / 'Shatter.png'), 'assets'),
     ],
     hiddenimports=[
         # pywebview EdgeChromium backend (Windows)
@@ -83,7 +83,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,          # GUI app, no console window
-    icon=str(ROOT / 'Shatter.ico'),
+    icon=str(ROOT / 'assets' / 'Shatter.ico'),
 )
 
 coll = COLLECT(
