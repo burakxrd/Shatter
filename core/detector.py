@@ -21,8 +21,8 @@ _HASHCAT_FALLBACKS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'^WPA\*'), "WPA/WPA2 PMKID/EAPOL (m=22000)"),
 
     # PKZIP variants
-    (re.compile(r'^\$pkzip2?\$'), "PKZIP (m=17200)"),
-    (re.compile(r'^\$zip2?\$'), "ZIP / WinZip (m=13600)"),
+    (re.compile(r'(?:^|:)\$pkzip2?\$'), "PKZIP (m=17200)"),
+    (re.compile(r'(?:^|:)\$zip2?\$'), "ZIP / WinZip (m=13600)"),
 
     # RAR
     (re.compile(r'^\$RAR3\$'), "RAR3-hp (m=12500)"),
