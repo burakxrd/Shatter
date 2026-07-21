@@ -12,7 +12,9 @@ log = logging.getLogger(__name__)
 
 TARGET_HASH_FILE = TEMP_DIR / "target_hash.txt"
 
-class JtrEngine:
+from core.engine_base import BaseEngine
+
+class JtrEngine(BaseEngine):
     """Manages John the Ripper command building and execution using ManagedProcess."""
 
     def __init__(self, jtr_dir: Path | None = None) -> None:
@@ -71,10 +73,16 @@ class JtrEngine:
         return None
 
     def _build_jtr_cmd(self, jtr_format: str | None, settings: dict[str, Any]) -> list[str]:
+        from core.sanitizer import validate_cli_arg
         cmd = [str(self._get_jtr_exe())]
         
         if jtr_format:
-            cmd.append(f"--format={jtr_format}")
+            # Sadece alfanumerik ve tire/altçizgi
+            import re
+            if re.match(r'^[a-zA-Z0-9_\-]+$', jtr_format):
+                cmd.append(f"--format={jtr_format}")
+            else:
+                log.warning("Invalid jtr_format rejected: %s", jtr_format)
             
         # JtR uses --wordlist for dictionary attacks
         if settings.get("wordlist"):

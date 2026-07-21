@@ -178,8 +178,6 @@ def parse_cap_to_hc22000(filepath: str) -> list[str]:
 
     for (mac_ap, mac_sta), msgs in pairs.items():
         essid = essid_map.get(mac_ap, "")
-        if not essid:
-            continue
 
         m1_m3 = [m for m in msgs if m["msg_num"] in (1, 3)]
         m2_list = [m for m in msgs if m["msg_num"] == 2]
@@ -191,8 +189,6 @@ def parse_cap_to_hc22000(filepath: str) -> list[str]:
                 if m["pkt_index"] < m2["pkt_index"]:
                     if best is None or m["pkt_index"] > best["pkt_index"]:
                         best = m
-            if best is None and m1_m3:
-                best = m1_m3[0]
             if best is None:
                 continue
 
@@ -225,14 +221,16 @@ def parse_cap_to_hc22000(filepath: str) -> list[str]:
     return results
 
 
-def cap_to_hc22000_string(filepath: str) -> str:
+from core.result import ParseResult
+
+def cap_to_hc22000_string(filepath: str) -> ParseResult:
     """
-    Convenience wrapper: returns the first hash line or an error message.
+    Convenience wrapper: returns the hash lines or an error message.
     """
     try:
         hashes = parse_cap_to_hc22000(filepath)
         if not hashes:
-            return "[!] No WPA/WPA2 handshake found in capture file."
-        return hashes[0]
+            return ParseResult(error="No WPA/WPA2 handshake found in capture file.")
+        return ParseResult(data="\n".join(hashes))
     except Exception as e:
-        return f"[!] Failed to parse capture file: {e}"
+        return ParseResult(error=f"Failed to parse capture file: {e}")

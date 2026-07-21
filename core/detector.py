@@ -87,34 +87,34 @@ _HASHCAT_FALLBACKS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'^\$krb5pa\$18\$'), "Kerberos 5 AES256 (m=19700)"),
 
     # NetNTLMv2 (challenge/response format)
-    (re.compile(r'^[^:]+::\S+:[a-fA-F0-9]{16}:[a-fA-F0-9]{32}:[a-fA-F0-9]+$'),
+    (re.compile(r'^[^:]+::\S+:[a-f0-9]{16}:[a-f0-9]{32}:[a-f0-9]+$', re.IGNORECASE),
      "NetNTLMv2 (m=5600)"),
 
     # NetNTLMv1
-    (re.compile(r'^[^:]+::\S+:[a-fA-F0-9]{48}:[a-fA-F0-9]{48}:[a-fA-F0-9]{16}$'),
+    (re.compile(r'^[^:]+::\S+:[a-f0-9]{48}:[a-f0-9]{48}:[a-f0-9]{16}$', re.IGNORECASE),
      "NetNTLMv1 (m=5500)"),
 
     # IPMI2 RAKP
-    (re.compile(r'^[a-f0-9]{40}:[a-f0-9]+:[a-f0-9]+:[a-f0-9]+$'),
+    (re.compile(r'^[a-f0-9]{40}:[a-f0-9]+:[a-f0-9]+:[a-f0-9]+$', re.IGNORECASE),
      "IPMI2 RAKP (m=7300)"),
 
     # MSSQL 2012+
-    (re.compile(r'^0x0200[a-fA-F0-9]{136}$', re.IGNORECASE), "MSSQL 2012+ (m=1731)"),
+    (re.compile(r'^0x0200[a-f0-9]{136}$', re.IGNORECASE), "MSSQL 2012+ (m=1731)"),
 
     # MSSQL 2005
-    (re.compile(r'^0x0100[a-fA-F0-9]{88}$', re.IGNORECASE), "MSSQL 2005 (m=132)"),
+    (re.compile(r'^0x0100[a-f0-9]{88}$', re.IGNORECASE), "MSSQL 2005 (m=132)"),
 
     # MySQL 4.1+
-    (re.compile(r'^\*[A-Fa-f0-9]{40}$'), "MySQL 4.1+ (m=300)"),
+    (re.compile(r'^\*[a-f0-9]{40}$', re.IGNORECASE), "MySQL 4.1+ (m=300)"),
 
     # PostgreSQL MD5
-    (re.compile(r'^md5[a-f0-9]{32}$'), "PostgreSQL MD5 (m=12)"),
+    (re.compile(r'^md5[a-f0-9]{32}$', re.IGNORECASE), "PostgreSQL MD5 (m=12)"),
 
     # macOS v10.8+
-    (re.compile(r'^\$ml\$\d+\$[a-fA-F0-9]+\$[a-fA-F0-9]+$'), "macOS v10.8+ (m=7100)"),
+    (re.compile(r'^\$ml\$\d+\$[a-f0-9]+\$[a-f0-9]+$', re.IGNORECASE), "macOS v10.8+ (m=7100)"),
 
     # Oracle 11g+
-    (re.compile(r'^S:[A-Fa-f0-9]{60}$'), "Oracle 11g+ (m=112)"),
+    (re.compile(r'^S:[a-f0-9]{60}$', re.IGNORECASE), "Oracle 11g+ (m=112)"),
 
     # LDAP variants
     (re.compile(r'^\{SSHA\}'), "LDAP SSHA (m=111)"),
@@ -127,10 +127,15 @@ _HASHCAT_FALLBACKS: list[tuple[re.Pattern, str]] = [
 ]
 
 
+def extract_all_m_values(detection_str: str) -> list[str]:
+    """Tüm olası m= değerlerini döndürür."""
+    return re.findall(r'm=(\d+)', detection_str)
+
+
 def extract_m_value(detection_str: str) -> str | None:
-    """Pull the first m=XXXX number from a detection string."""
-    match = re.search(r'm=(\d+)', detection_str)
-    return match.group(1) if match else None
+    """Geriye uyumlu: İlk m= değerini döndürür."""
+    values = extract_all_m_values(detection_str)
+    return values[0] if values else None
 
 
 @lru_cache(maxsize=128)

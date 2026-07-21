@@ -5,6 +5,17 @@ from pathlib import Path
 
 from core.cap_parser import cap_to_hc22000_string
 
+def _get_python_interpreter() -> str:
+    import shutil
+    is_frozen = getattr(sys, 'frozen', False)
+    if not is_frozen:
+        return sys.executable
+    for name in ("python3", "python", "python3.exe", "python.exe"):
+        path = shutil.which(name)
+        if path:
+            return path
+    raise FileNotFoundError("Python interpreter not found.")
+
 log = logging.getLogger(__name__)
 
 # Mapping: file extension -> (extractor tool, extra args)
@@ -27,84 +38,92 @@ HASH_EXTRACTORS: dict[str, tuple[str, list[str]]] = {
 # Extensions handled natively by cap_parser (not via *2john tools)
 CAP_EXTENSIONS = {".cap", ".pcap", ".pcapng"}
 
-def extract_hash_from_file(filepath: str, jtr_dir: Path) -> dict:
+import os
+
+def _calculate_timeout(filepath: str, base: int = 30, per_mb: int = 10, max_timeout: int = 300) -> int:
+    try:
+        size_mb = os.path.getsize(filepath) / (1024 * 1024)
+    except OSError:
+        return base
+    return min(base + int(size_mb * per_mb), max_timeout)
+
+from core.result import ParseResult
+
+def extract_hash_from_file(filepath: str, jtr_dir: Path) -> ParseResult:
     """
     Try to extract a hash from an encrypted file.
-    Returns: {"hash": extracted_hash, "engine": "jtr" | "hashcat", "error": err_msg}
+    Returns: ParseResult
     """
     ext = Path(filepath).suffix.lower()
 
     if ext in CAP_EXTENSIONS:
         res = cap_to_hc22000_string(filepath)
-        if res.startswith("[!]"):
-            return {"hash": "", "engine": "", "error": res}
-        return {"hash": res, "engine": "hashcat", "error": None}
+        if not res.ok:
+            return ParseResult(error=res.error)
+        return ParseResult(data=res.data, engine="hashcat")
 
     extractor = HASH_EXTRACTORS.get(ext)
 
     if not extractor:
         supported = ', '.join(sorted(set(HASH_EXTRACTORS) | CAP_EXTENSIONS))
-        return {"hash": "", "engine": "", "error": f"[!] No extractor for '{ext}' files. Supported: {supported}"}
+        return ParseResult(error=f"No extractor for '{ext}' files. Supported: {supported}")
 
     tool, extra = extractor
     tool_path = jtr_dir / tool
 
     if not tool_path.exists():
-        return {"hash": "", "engine": "", "error": f"[!] '{tool}' not found in {jtr_dir}."}
+        return ParseResult(error=f"'{tool}' not found in {jtr_dir}.")
 
     cmd: list[str] = [str(tool_path)] + extra + [filepath]
 
     if tool.endswith(".py"):
-        cmd = ["python"] + cmd
+        try:
+            python = _get_python_interpreter()
+            cmd = [python] + cmd
+        except FileNotFoundError as e:
+            return ParseResult(error=str(e))
     elif tool.endswith(".pl"):
-        cmd = ["perl"] + cmd
+        import shutil
+        perl = shutil.which("perl")
+        if not perl:
+            return ParseResult(error="Perl interpreter not found.")
+        cmd = [perl] + cmd
 
     log.info("Running: %s", ' '.join(cmd))
+    timeout = _calculate_timeout(filepath)
 
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=30,
+            cmd, capture_output=True, text=True, timeout=timeout,
             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
         output = result.stdout.strip()
         if not output and result.stderr.strip():
-            return {"hash": "", "engine": "", "error": f"[!] {tool} error: {result.stderr.strip()}"}
+            return ParseResult(error=f"{tool} error: {result.stderr.strip()}")
         if not output:
-            return {"hash": "", "engine": "", "error": f"[!] {tool} returned no output."}
+            return ParseResult(error=f"{tool} returned no output.")
 
         lines = output.splitlines()
-        extracted = ""
+        raw_hash_line = ""
         for line in lines:
-            line = line.strip()
-            if not line or line.startswith("Warning:") or line.startswith("File "):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.lower().startswith(("warning:", "file ", "usage:", "note:")):
                 continue
 
-            if ':$' in line:
-                extracted = '$' + line.split(':$', 1)[1]
-                break
-            elif line.startswith('$'):
-                extracted = line
+            if ':$' in stripped or stripped.startswith('$'):
+                raw_hash_line = stripped
                 break
 
-        if not extracted:
-            extracted = output
+        if not raw_hash_line:
+            return ParseResult(error=f"No valid hash pattern found in {tool} output.")
 
-        # For Hashcat compatibility, we used to strip metadata.
-        # But for JtR, we want the raw string (usually filename:$hash).
-        # We will return the raw string to be used directly by JtR.
-        # NTH or detector can still parse the hash type.
-        # Actually, to be safe, we return the raw line that contains the hash.
-        raw_hash_line = extracted
-        for line in lines:
-            if ':$' in line or line.startswith('$'):
-                raw_hash_line = line
-                break
-
-        return {"hash": raw_hash_line.strip(), "engine": "jtr", "error": None}
+        return ParseResult(data=raw_hash_line, engine="jtr")
 
     except FileNotFoundError:
-        return {"hash": "", "engine": "", "error": f"[!] '{tool}' not found. Install John the Ripper and ensure it's in PATH."}
+        return ParseResult(error=f"'{tool}' not found. Install John the Ripper and ensure it's in PATH.")
     except subprocess.TimeoutExpired:
-        return {"hash": "", "engine": "", "error": f"[!] '{tool}' timed out."}
+        return ParseResult(error=f"'{tool}' timed out.")
     except Exception as e:
-        return {"hash": "", "engine": "", "error": f"[!] Extraction failed: {e}"}
+        return ParseResult(error=f"Extraction failed: {e}")

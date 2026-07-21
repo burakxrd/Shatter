@@ -13,14 +13,20 @@
 // ═══════════════════════════════════════════════
 
 class TerminalManager {
-    constructor(logsPanelEl) {
+    constructor(logsPanelEl, options = {}) {
         this._events = document.getElementById('log-events');
         this._sessionInfo = document.getElementById('log-session-info');
         this._liveStats = document.getElementById('log-live-stats');
         this._logsPanel = logsPanelEl;
         this._userScrolledUp = false;
         this._lastStatus = null;
+        this._crackedPasswords = new Set();
         this.MAX_EVENTS = 500;
+        this.MAX_TRACKED = 10000;
+
+        // Callback'ler — dışarıdan enjekte edilir
+        this._onProgress = options.onProgress || (() => {});
+        this._onExtractDone = options.onExtractDone || (() => {});
 
         this._events.addEventListener('scroll', () => {
             const atBottom =
@@ -85,7 +91,7 @@ class TerminalManager {
                 break;
 
             case 'progress':
-                updateProgress(parseFloat(d.percent));
+                this._onProgress(parseFloat(d.percent));
                 break;
 
             case 'eta':
@@ -98,11 +104,10 @@ class TerminalManager {
                 break;
 
             case 'hash_cracked':
-                if (this._crackedPasswords && this._crackedPasswords.has(d.password)) {
+                if (this._crackedPasswords.has(d.password)) {
                     break; // deduplicate
                 }
-                if (!this._crackedPasswords) this._crackedPasswords = new Set();
-                this._crackedPasswords.add(d.password);
+                this._addCrackedPassword(d.password);
                 this._addCrackedCard(d.hash, d.password);
                 break;
 
@@ -116,6 +121,10 @@ class TerminalManager {
 
             case 'info':
                 this._addEventCard('ℹ️', d.message, 'info');
+                break;
+
+            case 'extract_done':
+                this._onExtractDone(d);
                 break;
 
             case 'separator': {
@@ -248,7 +257,7 @@ class TerminalManager {
     }
 
     /** Clear all events, session info, and live stats. */
-    clear() {
+    clear(resetState = false) {
         this._events.innerHTML = '';
         this._sessionInfo.classList.add('hidden');
         this._liveStats.classList.add('hidden');
@@ -265,9 +274,25 @@ class TerminalManager {
         });
         this._lastStatus = null;
         this._userScrolledUp = false;
-        this._crackedPasswords = new Set();
-        updateProgress(0);
+        
+        if (resetState) {
+            this._crackedPasswords.clear();
+        }
+        
+        this._onProgress(0);
         document.getElementById('progress-text').children[1].innerText = 'ETA: --:--:--';
+    }
+
+    _addCrackedPassword(key) {
+        if (this._crackedPasswords.size >= this.MAX_TRACKED) {
+            // En eski %10'unu sil (Set insertion order korunur)
+            const toDelete = Math.floor(this.MAX_TRACKED * 0.1);
+            const iter = this._crackedPasswords.values();
+            for (let i = 0; i < toDelete; i++) {
+                this._crackedPasswords.delete(iter.next().value);
+            }
+        }
+        this._crackedPasswords.add(key);
     }
 
     /** Toggle the slide-over logs panel. */
@@ -320,6 +345,7 @@ class HashcatBridge {
     stopCrack() { return this._call('stop_crack'); }
     pauseCrack() { return this._call('pause_crack'); }
     checkpointCrack() { return this._call('checkpoint_crack'); }
+    isRunning() { return this._call('is_running'); }
     getDevices() { return this._call('get_devices'); }
     runBenchmark(deviceId) { return this._call('run_benchmark', deviceId); }
     browseFolder() { return this._call('browse_folder'); }
@@ -375,12 +401,16 @@ class SettingsStore {
 
     /** Debounced save — persists config 500ms after last change. */
     save() {
+        const cfg = this.getSettingsObject();
+        cfg.hc_path = this.hcPath;
+        cfg.jtr_path = this.jtrPath;
+        localStorage.setItem('shatter_settings_backup', JSON.stringify(cfg));
+
         if (this._saveTimeout) clearTimeout(this._saveTimeout);
         this._saveTimeout = setTimeout(async () => {
-            const cfg = this.getSettingsObject();
-            cfg.hc_path = this.hcPath;
-            cfg.jtr_path = this.jtrPath;
             await this._bridge.saveConfig(cfg);
+            localStorage.removeItem('shatter_settings_backup');
+            this._saveTimeout = null;
         }, 500);
     }
 
@@ -461,7 +491,19 @@ class SettingsStore {
 // ═══════════════════════════════════════════════
 
 const terminal = new TerminalManager(
-    document.getElementById('logs-panel')
+    document.getElementById('logs-panel'),
+    {
+        onProgress: (percent) => updateProgress(percent),
+        onExtractDone: (d) => {
+            setButtonLoading(document.getElementById('btn-extract'), false);
+            if (d.error) {
+                showToast(d.error, 'error');
+            } else if (d.hash) {
+                document.getElementById('hash-input').value = d.hash;
+                document.getElementById('hash-input').dispatchEvent(new Event('input'));
+            }
+        }
+    }
 );
 const bridge = new HashcatBridge();
 const store = new SettingsStore(bridge);
@@ -475,7 +517,7 @@ window.onHashcatEvent = function (event) {
 };
 
 window.clearHashcatOutput = function () {
-    terminal.clear();
+    terminal.clear(true);
 };
 
 // ── Toast Notifications ──
@@ -713,13 +755,21 @@ document.getElementById('hash-input').addEventListener('input', async (e) => {
     }
     const res = await bridge.detectHash(val);
     if (!res) return;
-    document.getElementById('algo-name').innerText = res.algo;
-    if (res.algo.includes('Unknown') || res.algo.includes('Failed')) {
+    
+    if (res.needs_manual_selection) {
+        document.getElementById('algo-name').innerText = 'Unknown - Manual Selection Required';
         document.getElementById('algo-name').className = 'text-danger';
+        document.getElementById('hash-mode').value = '';
+        showToast('Hash type could not be detected. Please select or enter the mode manually.', 'warning');
     } else {
-        document.getElementById('algo-name').className = 'text-accent';
+        document.getElementById('algo-name').innerText = res.algo;
+        if (res.algo.includes('Unknown') || res.algo.includes('Failed')) {
+            document.getElementById('algo-name').className = 'text-danger';
+        } else {
+            document.getElementById('algo-name').className = 'text-accent';
+        }
+        document.getElementById('hash-mode').value = res.m_value || '0';
     }
-    document.getElementById('hash-mode').value = res.m_value;
 
     store.hashFilePath = null;
     document.getElementById('hashfile-label').classList.add('hidden');
@@ -740,11 +790,10 @@ async function extractHash() {
     const btn = document.getElementById('btn-extract');
     setButtonLoading(btn, true);
     const res = await bridge.extractHash();
-    setButtonLoading(btn, false);
-    if (res && res.hash) {
-        document.getElementById('hash-input').value = res.hash;
-        document.getElementById('hash-input').dispatchEvent(new Event('input'));
+    if (!res || res.cancelled || res.error) {
+        setButtonLoading(btn, false);
     }
+    // Success path waits for "extract_done" event.
 }
 
 async function loadHashFile() {
@@ -875,7 +924,11 @@ async function startCrack() {
         document.getElementById('btn-restore').style.display = 'flex';
     }
 
-    await bridge.startCrack(settings);
+    const res = await bridge.startCrack(settings);
+    if (!res) {
+        window.onCrackDone();
+        return;
+    }
 }
 
 async function restoreCrack() {
@@ -890,11 +943,42 @@ async function restoreCrack() {
     document.getElementById('process-controls').style.display = 'flex';
     terminal.open();
 
-    await bridge.restoreCrack(session);
+    const res = await bridge.restoreCrack(session);
+    if (!res) {
+        window.onCrackDone();
+        return;
+    }
 }
 
 async function stopCrack() {
-    await bridge.stopCrack();
+    try {
+        await bridge.stopCrack();
+    } catch (e) {
+        console.error('stopCrack failed:', e);
+    }
+
+    const POLL_INTERVAL = 2000;
+    const MAX_WAIT = 15000;
+    let waited = 0;
+
+    const watchdog = setInterval(async () => {
+        waited += POLL_INTERVAL;
+        
+        try {
+            const status = await bridge.isRunning();
+            if (!status) {
+                clearInterval(watchdog);
+                if (isCracking) window.onCrackDone();
+                return;
+            }
+        } catch (e) {}
+
+        if (waited >= MAX_WAIT) {
+            clearInterval(watchdog);
+            console.warn('Backend unresponsive after 15s — forcing UI reset');
+            if (isCracking) window.onCrackDone();
+        }
+    }, POLL_INTERVAL);
 }
 
 async function pauseCrack() {
@@ -1016,28 +1100,48 @@ function toggleLogs() {
 }
 
 function clearTerminal() {
-    terminal.clear();
+    terminal.clear(false);
 }
 
 // ── Device Loading ──
 
 async function loadDevices() {
-    if (!store.hcPath) return;
-    const devices = await bridge.getDevices();
-    if (!devices) return;
     const sel = document.getElementById('device-select');
-    sel.innerHTML = '';
-    devices.forEach((d) => {
-        const opt = document.createElement('option');
-        opt.value = d.id;
-        opt.innerText = d.name;
-        sel.appendChild(opt);
-    });
+    if (!store.hcPath) return;
+
+    try {
+        const devices = await bridge.getDevices();
+
+        if (!devices || devices.length === 0) {
+            sel.innerHTML = '<option value="" disabled selected>No devices detected</option>';
+            sel.disabled = true;
+            return;
+        }
+
+        sel.disabled = false;
+        sel.innerHTML = devices
+            .map(d => `<option value="${d.id}">${d.name}</option>`)
+            .join('');
+    } catch (e) {
+        console.error('Failed to load devices:', e);
+        sel.innerHTML = '<option value="" disabled selected>Failed to load devices</option>';
+        sel.disabled = true;
+    }
 }
 
 // ── Initialization ──
 
 window.addEventListener('pywebviewready', async function () {
+    const backup = localStorage.getItem('shatter_settings_backup');
+    if (backup) {
+        try {
+            await bridge.saveConfig(JSON.parse(backup));
+            localStorage.removeItem('shatter_settings_backup');
+        } catch (e) {
+            console.warn('Failed to recover settings backup:', e);
+        }
+    }
+
     const cfg = await store.restore();
     if (cfg) {
         await bridge.setToolPaths(store.hcPath || '', store.jtrPath || '');

@@ -12,7 +12,9 @@ log = logging.getLogger(__name__)
 
 TARGET_HASH_FILE = TEMP_DIR / "target_hash.txt"
 
-class HashcatEngine:
+from core.engine_base import BaseEngine
+
+class HashcatEngine(BaseEngine):
     """Manages Hashcat command building and execution using ManagedProcess."""
 
     def __init__(self, hashcat_exe: Path | None = None, hashcat_dir: Path | None = None) -> None:
@@ -67,17 +69,33 @@ class HashcatEngine:
         return None
 
     def _build_hashcat_cmd(self, m_value: str, settings: dict[str, Any]) -> list[str]:
+        from core.sanitizer import validate_cli_arg
         cmd = [str(self._get_hashcat_exe())]
         a_mode = settings.get("attack_mode", "0")
         cmd += ["-a", a_mode, "-m", m_value]
         cmd += ["-d", settings.get("device", "1")]
-        cmd += ["-w", settings.get("workload_profile", "2")]
+
+        workload = settings.get("workload_profile", "2")
+        if workload:
+            valid, err = validate_cli_arg("workload_profile", workload)
+            if valid:
+                cmd += ["-w", workload]
+            else:
+                log.warning("Invalid workload_profile rejected: %s", err)
+
         cmd += ["--status", "--status-timer=2"]
 
         if settings.get("optimized_kernel"):
             cmd.append("-O")
-        if settings.get("session_name"):
-            cmd += ["--session", settings["session_name"]]
+        
+        session = settings.get("session_name")
+        if session:
+            valid, err = validate_cli_arg("session_name", session)
+            if valid:
+                cmd += ["--session", session]
+            else:
+                log.warning("Invalid session_name rejected: %s", err)
+
         if settings.get("hwmon_temp_abort"):
             cmd += ["--hwmon-temp-abort", settings["hwmon_temp_abort"]]
 
@@ -96,18 +114,25 @@ class HashcatEngine:
         hash_file = settings.get("hash_file_path") or str(TARGET_HASH_FILE)
         cmd.append(hash_file)
 
+        mask = settings.get("mask")
+        if mask:
+            valid, err = validate_cli_arg("mask", mask)
+            if not valid:
+                log.warning("Invalid mask rejected: %s", err)
+                mask = None
+
         if a_mode == "3":
-            if settings.get("mask"):
-                cmd.append(settings["mask"])
+            if mask:
+                cmd.append(mask)
         elif a_mode in ("6", "7"):
             if a_mode == "6":
                 if settings.get("wordlist"):
                     cmd.append(settings["wordlist"])
-                if settings.get("mask"):
-                    cmd.append(settings["mask"])
+                if mask:
+                    cmd.append(mask)
             else:
-                if settings.get("mask"):
-                    cmd.append(settings["mask"])
+                if mask:
+                    cmd.append(mask)
                 if settings.get("wordlist"):
                     cmd.append(settings["wordlist"])
         else:
@@ -212,6 +237,13 @@ class HashcatEngine:
         on_done()
 
     def run_restore(self, session_name: str, on_output: Callable[[str], None], on_done: Callable[[], None]) -> None:
+        from core.sanitizer import validate_cli_arg
+        valid, err = validate_cli_arg("session_name", session_name)
+        if not valid:
+            on_output(f"[!] Invalid session_name: {err}\n")
+            on_done()
+            return
+
         cmd = [str(self._get_hashcat_exe()), "--session", session_name, "--restore",
                "--status", "--status-timer=2"]
 

@@ -17,13 +17,13 @@ _NOISE_PREFIXES = (
 _NOISE_CONTAINS = ("Please be patient", "nvmlDeviceGetFanSpeed", "[s]tatus [p]ause")
 
 _RE_VERSION   = re.compile(r'^hashcat \(v([\d.]+)\) starting')
-_RE_DEVICE    = re.compile(r'^\*\s*Device\s*#(\d+):\s*(.+?)(?:,\s*(\d+)/(\d+)\s*MB)?(?:,\s*(\d+)MCU)?$')
+_RE_DEVICE    = re.compile(r'^\*\s*Device\s*#(\d+):\s*(.+?)(?:,\s*(\d+)/(\d+)\s*MB(?:\s*\([^)]*\))?)?(?:,\s*(\d+)MCU)?$')
 _RE_FILENAME  = re.compile(r'^\*\s*Filename\.*:\s*(.+)')
 _RE_PASSWORDS = re.compile(r'^\*\s*Passwords\.*:\s*([\d,]+)')
 _RE_HASH_MODE = re.compile(r'^Hash[.\s]*Mode\.*:\s*(\d+)\s*\((.+)\)')
 _RE_HASHMODE_BENCH = re.compile(r'^Hashmode:\s*(\d+)\s*-\s*(.+)')
 _RE_STATUS    = re.compile(r'^Status\.*:\s*(.+)')
-_RE_SPEED     = re.compile(r'^Speed\.#(\d+)\.*:\s*(.+?)(?:\s*@|$)')
+_RE_SPEED     = re.compile(r'^Speed\.#(\d+|\*)\.*:\s*(.+?)(?:\s*@|$)')
 _RE_RECOVERED = re.compile(r'^Recovered\.*:\s*(\d+)/(\d+)\s*\(([\d.]+)%\)')
 _RE_PROGRESS  = re.compile(r'^Progress\.*:\s*([\d,]+)/([\d,]+)\s*\(([\d.]+)%\)')
 _RE_ETA       = re.compile(r'^Time\.Estimated\.*:\s*(.+)')
@@ -45,13 +45,13 @@ def parse_hc_line(line: str) -> dict | None:
     if s.startswith("[*]"):
         return {"type": "info", "data": {"message": s[3:].strip()}}
 
-    if "✅" in s:
-        if "PASSWORD" in s:
+    if s.startswith("✅"):
+        if s.startswith("✅  PASSWORD:") or s.startswith("✅  PASSWORD FOUND:"):
             parts = s.split(":", 1)
             if len(parts) == 2:
                 pwd = parts[1].strip()
                 return {"type": "hash_cracked", "data": {"hash": "Session Result", "password": pwd}}
-        return {"type": "success", "data": {"message": s.replace("✅", "").strip()}}
+        return {"type": "success", "data": {"message": s[1:].strip()}}
     if "❌" in s:
         return {"type": "error", "data": {"message": s.replace("❌", "").strip()}}
 
