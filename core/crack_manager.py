@@ -17,11 +17,9 @@ class CrackManager:
         self.active_engine_name = "hashcat"
         self._active_engine = self.hc_engine
         self._starting = False
-        import threading
-        self._start_lock = threading.Lock()
 
     def _activate_engine(self, engine_name: str) -> None:
-        """Aktif motoru güvenli şekilde değiştirir."""
+        """Safely switches the active engine."""
         if engine_name not in ("hashcat", "jtr"):
             raise ValueError(f"Unknown engine: {engine_name}")
         self.active_engine_name = engine_name
@@ -56,7 +54,7 @@ class CrackManager:
                 log.error("John executable not found in %s", jtr_dir)
 
     def _is_executable(self, path: Path) -> bool:
-        """Dosyanın çalıştırılabilir olup olmadığını kontrol eder."""
+        """Checks if the file is executable."""
         import os
         import sys
         if sys.platform == "win32":
@@ -71,10 +69,11 @@ class CrackManager:
         self._activate_engine("hashcat")
         self.hc_engine.run_benchmark(device_id, on_output, on_done)
 
-    def run_restore(self, session_name: str, on_output: Callable[[str], None], on_done: Callable[[], None]) -> None:
+    def run_restore(self, session_name: str, restore_file_path: str, on_output: Callable[[str], None], on_done: Callable[[], None]) -> None:
         # Currently only supporting hashcat restore
+        self._starting = True
         self._activate_engine("hashcat")
-        self.hc_engine.run_restore(session_name, on_output, on_done)
+        self.hc_engine.run_restore(session_name, restore_file_path, on_output, lambda: self._on_engine_done(on_done))
 
     def stop(self) -> None:
         self._active_engine.stop()
@@ -89,24 +88,29 @@ class CrackManager:
         self._active_engine.checkpoint()
 
     def mark_starting(self) -> None:
-        """Yarış durumunu önlemek için 'başlatılıyor' bayrağını set eder."""
+        """Sets the 'starting' flag to prevent race conditions."""
         self._starting = True
 
     @property
     def is_running(self) -> bool:
-        """Herhangi bir motor çalışıyor mu?"""
+        """Check if any engine is currently running."""
         return self.hc_engine.is_running or self.jtr_engine.is_running or self._starting
 
     @property
+    def last_session_info(self) -> tuple[str | None, str | None]:
+        """Returns (session_name, restore_file_path) from the last crack command."""
+        rf = self.hc_engine._last_restore_file
+        return (self.hc_engine._last_session, str(rf) if rf else None)
+
+    @property
     def running_engine_name(self) -> str | None:
-        """Çalışan motorun adını döndürür. Hiçbiri çalışmıyorsa None."""
+        """Returns the name of the running engine. None if none are running."""
         if self.hc_engine.is_running:
             return "hashcat"
         if self.jtr_engine.is_running:
             return "jtr"
         if self._starting:
-            return self.active_engine_name  # Başlatılmakta olan
-        return None
+            return self.active_engine_name
 
     @property
     def is_paused(self) -> bool:
@@ -130,6 +134,6 @@ class CrackManager:
             self.hc_engine.run_crack(hash_value, m_value, settings, on_output, lambda: self._on_engine_done(on_done))
 
     def _on_engine_done(self, user_callback: Callable[[], None]) -> None:
-        """Motor bittiğinde state'i temizle."""
+        """Clean up state when the engine finishes."""
         self._starting = False
         user_callback()

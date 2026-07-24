@@ -7,13 +7,7 @@ import core.tool_paths as tool_paths
 
 log = logging.getLogger(__name__)
 
-def _ok(data=None):
-    if data is None:
-        data = {}
-    return {"success": True, "data": data, "error": None}
-
-def _err(msg):
-    return {"success": False, "data": None, "error": msg}
+from ui.envelope import _ok, _err
 
 class DownloadMixin:
     """Download manager mixin'i."""

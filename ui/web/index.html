@@ -144,6 +144,56 @@
             cursor: not-allowed;
         }
 
+        /* Setting info tooltips */
+        .info-tip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid #525252;
+            color: #737373;
+            font-size: 9px;
+            font-weight: 700;
+            font-style: normal;
+            cursor: help;
+            flex-shrink: 0;
+            transition: border-color 0.2s, color 0.2s;
+            line-height: 1;
+        }
+        .info-tip:hover {
+            border-color: #f97316;
+            color: #f97316;
+        }
+        .info-tip::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1c1c1c;
+            color: #d4d4d4;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 400;
+            line-height: 1.45;
+            white-space: normal;
+            width: max-content;
+            max-width: 260px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+        .info-tip:hover::after {
+            opacity: 1;
+        }
+
         /* Structured Event Log Styles */
         .log-separator {
             height: 1px;
@@ -454,8 +504,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
-                                <span>Detected Algorithm: <span class="text-slate-200 font-mono text-xs"
-                                        id="algo-name">None</span></span>
+                                <span class="flex items-center gap-1.5">Detected Algorithm <span class="info-tip" data-tip="Please select the correct Hash Mode for your target, otherwise the cracking process will fail.">i</span> : 
+                                    <span class="text-accent font-mono font-semibold text-xs ml-1" id="algo-name">None</span>
+                                </span>
                             </div>
                             <div class="flex items-center gap-2">
                                 <label class="text-xs text-textDim uppercase font-semibold">Mode (-m)</label>
@@ -546,7 +597,7 @@
                         </button>
 
                         <button id="btn-restore" onclick="restoreCrack()"
-                            class="hidden flex-1 py-4 rounded-xl bg-bgCard border border-borderSubtle hover:border-textDim font-bold text-xl tracking-wide transition-all justify-center items-center gap-3">
+                            class="flex-1 py-4 rounded-xl bg-bgCard border border-borderSubtle hover:border-textDim font-bold text-xl tracking-wide transition-all flex justify-center items-center gap-3">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
@@ -663,7 +714,7 @@
                         <h3 class="text-xs font-semibold tracking-wider text-textDim uppercase">ENGINE RULES</h3>
 
                         <div>
-                            <label class="block text-xs text-textDim mb-1">Attack Mode</label>
+                            <label class="block text-xs text-textDim mb-1 flex items-center gap-1.5">Attack Mode <span class="info-tip" data-tip="Determines how hashcat generates password candidates. Straight uses a wordlist, Brute-force tries all combinations via a mask, Hybrid combines both.">i</span></label>
                             <select id="set-attack-mode"
                                 class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
                                 <option value="0">0 - Straight (Wordlist)</option>
@@ -675,7 +726,7 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs text-textDim mb-1">Workload Profile (-w)</label>
+                            <label class="block text-xs text-textDim mb-1 flex items-center gap-1.5">Workload Profile (-w) <span class="info-tip" data-tip="Controls GPU usage intensity. Low (1) keeps the desktop responsive, Nightmare (4) uses 100% GPU — may freeze your screen during cracking.">i</span></label>
                             <select id="set-workload"
                                 class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
                                 <option value="1">1 (Low)</option>
@@ -688,13 +739,19 @@
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" id="set-opt-kernel"
                                 class="w-4 h-4 accent-accent bg-bgPrimary border-borderSubtle rounded">
-                            <span class="text-sm">Optimized Kernel (-O)</span>
+                            <span class="text-sm flex items-center gap-1.5">Optimized Kernel (-O) <span class="info-tip" data-tip="Uses hand-tuned GPU kernels for faster speed, but limits maximum password length to 31 characters.">i</span></span>
                         </label>
 
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" id="set-disable-potfile"
                                 class="w-4 h-4 accent-accent bg-bgPrimary border-borderSubtle rounded">
-                            <span class="text-sm">Disable Potfile Check</span>
+                            <span class="text-sm flex items-center gap-1.5">Disable Potfile Check <span class="info-tip" data-tip="Skips checking if the hash was already cracked in a previous session. Enable this to re-crack a hash that's already in the potfile.">i</span></span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="set-disable-self-test"
+                                class="w-4 h-4 accent-accent bg-bgPrimary border-borderSubtle rounded">
+                            <span class="text-sm flex items-center gap-1.5">Disable Self-Test <span class="info-tip" data-tip="Skips Hashcat's built-in kernel self-test before cracking. Required for hashes with non-standard parameters (e.g. scrypt with N=1024). Low risk in practice.">i</span></span>
                         </label>
                     </div>
 
@@ -704,25 +761,25 @@
                         <h3 class="text-xs font-semibold tracking-wider text-textDim uppercase">LIMITS & SESSION</h3>
 
                         <div>
-                            <label class="block text-xs text-textDim mb-1">Session Name</label>
+                            <label class="block text-xs text-textDim mb-1 flex items-center gap-1.5">Session Name <span class="info-tip" data-tip="Unique name for this cracking session. Allows you to pause and resume (restore) a session later.">i</span></label>
                             <input type="text" id="set-session" placeholder="shatter"
                                 class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
                         </div>
 
                         <div>
-                            <label class="block text-xs text-textDim mb-1">Temp Abort (°C)</label>
+                            <label class="block text-xs text-textDim mb-1 flex items-center gap-1.5">Temp Abort (°C) <span class="info-tip" data-tip="Automatically stops cracking if GPU temperature exceeds this value to prevent hardware damage.">i</span></label>
                             <input type="number" id="set-temp" value="90"
                                 class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs text-textDim mb-1">Skip (-s)</label>
+                                <label class="block text-xs text-textDim mb-1 flex items-center gap-1.5">Skip (-s) <span class="info-tip" data-tip="Skip the first N password candidates. Useful for splitting work across multiple machines.">i</span></label>
                                 <input type="number" id="set-skip"
                                     class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
                             </div>
                             <div>
-                                <label class="block text-xs text-textDim mb-1">Limit (-l)</label>
+                                <label class="block text-xs text-textDim mb-1 flex items-center gap-1.5">Limit (-l) <span class="info-tip" data-tip="Stop after trying N password candidates. Use with Skip to divide keyspace between machines.">i</span></label>
                                 <input type="number" id="set-limit"
                                     class="w-full bg-bgPrimary border border-borderSubtle rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent">
                             </div>

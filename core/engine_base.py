@@ -1,41 +1,41 @@
 from abc import ABC, abstractmethod
 
 class BaseEngine(ABC):
-    """Tüm motorların ortak minimum arayüzü.
+    """Common minimum interface for all engines.
     
-    Sadece lifecycle metotları zorunlu.
-    run_crack imzası kasıtlı olarak BURADA DEĞİL —
-    her motorun parametre yapısı farklı.
+    Only lifecycle methods are mandatory.
+    run_crack signature is intentionally NOT HERE —
+    each engine has different parameter structures.
     """
 
     @abstractmethod
     def stop(self) -> None:
-        """Motoru güvenli şekilde durdurur."""
+        """Safely stops the engine."""
         pass
 
     @abstractmethod
     def pause(self) -> bool:
-        """Motoru duraklatır."""
+        """Pauses the engine."""
         pass
 
     @abstractmethod
     def resume(self) -> bool:
-        """Motoru duraklatmadan çıkarır."""
+        """Resumes the engine."""
         pass
 
     @abstractmethod
     def checkpoint(self) -> None:
-        """Motor için manuel checkpoint (save) alır."""
+        """Takes a manual checkpoint (save) for the engine."""
         pass
 
     @property
     @abstractmethod
     def is_running(self) -> bool:
-        """Motor çalışıyor mu?"""
+        """Is the engine running?"""
         pass
 
     @property
     @abstractmethod
     def is_paused(self) -> bool:
-        """Motor duraklatıldı mı?"""
+        """Is the engine paused?"""
         pass

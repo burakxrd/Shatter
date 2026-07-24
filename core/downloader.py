@@ -12,6 +12,7 @@ import logging
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.request import urlopen, Request
 
 log = logging.getLogger(__name__)
@@ -24,8 +25,22 @@ def _github_latest_release(repo: str) -> dict:
     """Fetch the latest release metadata from GitHub API."""
     url = _GITHUB_API.format(repo)
     req = Request(url, headers=_HEADERS)
-    with urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read())
+    try:
+        with urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read())
+    except HTTPError as e:
+        if e.code == 403:
+            raise ConnectionError(
+                f"GitHub API rate limit exceeded for {repo}. "
+                "Try again later or set a GITHUB_TOKEN."
+            ) from e
+        raise ConnectionError(
+            f"GitHub API returned HTTP {e.code} for {repo}: {e.reason}"
+        ) from e
+    except URLError as e:
+        raise ConnectionError(
+            f"Could not reach GitHub ({e.reason}). Check your internet connection."
+        ) from e
 
 
 def _find_asset(assets: list[dict], must_contain: list[str], extension: str) -> dict | None:
@@ -64,6 +79,19 @@ def _download_file(
                     on_progress(downloaded, total)
 
     log.info("Downloaded %s (%d bytes)", dest.name, downloaded)
+
+
+def _safe_extract_zip(archive: Path, dest: Path) -> None:
+    """Extract a .zip archive with path traversal protection (Zip Slip)."""
+    dest_resolved = dest.resolve()
+    with zipfile.ZipFile(archive, "r") as z:
+        for member in z.infolist():
+            target = (dest / member.filename).resolve()
+            if not str(target).startswith(str(dest_resolved)):
+                raise ValueError(
+                    f"Blocked path traversal in archive: {member.filename}"
+                )
+        z.extractall(dest)
 
 
 def _extract_7z(archive: Path, dest: Path) -> None:
@@ -120,8 +148,7 @@ def download_hashcat(
     if filename.endswith(".7z"):
         _extract_7z(archive_path, dest_dir)
     else:
-        with zipfile.ZipFile(archive_path, "r") as z:
-            z.extractall(dest_dir)
+        _safe_extract_zip(archive_path, dest_dir)
 
     archive_path.unlink(missing_ok=True)
 
@@ -179,8 +206,7 @@ def download_jtr(
     _download_file(url, archive_path, on_progress, is_cancelled)
 
     log.info("Extracting %s...", filename)
-    with zipfile.ZipFile(archive_path, "r") as z:
-        z.extractall(dest_dir)
+    _safe_extract_zip(archive_path, dest_dir)
 
     archive_path.unlink(missing_ok=True)
 

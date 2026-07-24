@@ -23,23 +23,17 @@ from ui.api_config import ConfigMixin
 from ui.api_download import DownloadMixin
 from ui.api_crack import CrackMixin
 
+from ui.envelope import _ok, _err
+
 log = logging.getLogger(__name__)
 CONFIG_FILE = TEMP_DIR / "config.json"
-
-
-def _ok(data=None) -> dict:
-    if data is None:
-        data = {}
-    return {"success": True, "data": data, "error": None}
-
-def _err(message: str) -> dict:
-    return {"success": False, "data": None, "error": message}
 
 
 class Api(ConfigMixin, DownloadMixin, CrackMixin):
     def __init__(self):
         super().__init__()
         self._window: webview.Window | None = None
+        self._is_maximized: bool = False
         
         self._crack_manager = CrackManager()
         self._sync_engine_paths()
@@ -87,6 +81,8 @@ class Api(ConfigMixin, DownloadMixin, CrackMixin):
     # ── Hash Detection & Extraction ──
 
     def detect_hash(self, hash_value: str) -> dict:
+        if not hash_value or not hash_value.strip():
+            return _ok({"algo": None, "m_value": None, "needs_manual_selection": True})
         from core.detector import extract_m_value
         algo = detect_hash_type(hash_value)
         m_value = extract_m_value(algo)
@@ -105,14 +101,17 @@ class Api(ConfigMixin, DownloadMixin, CrackMixin):
 
         path = result[0]
         self._sync_engine_paths()
-        
-        jtr_dir = tool_paths.jtr_dir
-        if not jtr_dir:
-            return self._error_response("John the Ripper is not configured. Go to General -> Tool Paths.")
+
+        # JtR is only needed for packet capture files; plain hash files don't need it
+        _CAP_EXTENSIONS = {".cap", ".pcap", ".pcapng"}
+        if Path(path).suffix.lower() in _CAP_EXTENSIONS:
+            jtr_dir = tool_paths.jtr_dir
+            if not jtr_dir:
+                return self._error_response("John the Ripper is not configured. Go to General -> Tool Paths.")
 
         def _extract_task():
             try:
-                res = extract_hash_from_file(path, jtr_dir)
+                res = extract_hash_from_file(path, tool_paths.jtr_dir)
                 self._emit_event({
                     "type": "extract_done",
                     "data": {"hash": res.data, "engine": res.engine, "error": res.error}
@@ -126,34 +125,55 @@ class Api(ConfigMixin, DownloadMixin, CrackMixin):
         threading.Thread(target=_extract_task, daemon=True).start()
         return _ok({"status": "extracting", "cancelled": False})
 
-    def load_hash_file(self) -> dict:
+    def _open_file_dialog(self, file_types: tuple = ()) -> dict:
+        """Helper: open a file dialog and return {path} or {cancelled: True}."""
         if not self._window:
             return self._error_response("No window")
-        result = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=("Text Files (*.txt)", "All Files (*.*)"))
+        kwargs = {"file_types": file_types} if file_types else {}
+        result = self._window.create_file_dialog(webview.OPEN_DIALOG, **kwargs)
         if result and len(result) > 0:
             return _ok({"path": result[0]})
         return _ok({"cancelled": True})
+
+    def load_hash_file(self) -> dict:
+        return self._open_file_dialog(("Text Files (*.txt)", "All Files (*.*)"))
 
     def select_wordlist(self) -> dict:
-        if not self._window:
-            return self._error_response("No window")
-        result = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=("Text Files (*.txt)", "All Files (*.*)"))
-        if result and len(result) > 0:
-            return _ok({"path": result[0]})
-        return _ok({"cancelled": True})
+        return self._open_file_dialog(("Text Files (*.txt)", "All Files (*.*)"))
 
     def add_rule(self) -> dict:
-        if not self._window:
-            return self._error_response("No window")
-        result = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=("Rule Files (*.rule)", "All Files (*.*)"))
-        if result and len(result) > 0:
-            return _ok({"path": result[0]})
-        return _ok({"cancelled": True})
+        return self._open_file_dialog(("Rule Files (*.rule)", "All Files (*.*)"))
 
     def browse_folder(self) -> dict:
         if not self._window:
             return self._error_response("No window")
         result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if result and len(result) > 0:
+            return _ok({"path": result[0]})
+        return _ok({"cancelled": True})
+
+    def browse_restore_file(self) -> dict:
+        """Open a file dialog filtered to .restore files, starting in the sessions folder."""
+        if not self._window:
+            return self._error_response("No window")
+
+        from core.hc_engine import SESSIONS_DIR
+        from core import APP_ROOT
+        import os
+
+        # Pick the most useful starting directory: sessions folder → temp → home
+        if SESSIONS_DIR.exists():
+            start_dir = str(SESSIONS_DIR)
+        elif (APP_ROOT / "temp").exists():
+            start_dir = str(APP_ROOT / "temp")
+        else:
+            start_dir = str(os.path.expanduser("~"))
+
+        result = self._window.create_file_dialog(
+            webview.OPEN_DIALOG,
+            directory=start_dir,
+            file_types=("Restore Files (*.restore)", "All Files (*.*)"),
+        )
         if result and len(result) > 0:
             return _ok({"path": result[0]})
         return _ok({"cancelled": True})
@@ -167,10 +187,10 @@ class Api(ConfigMixin, DownloadMixin, CrackMixin):
             self._window.evaluate_js("clearHashcatOutput()")
         return self.run_crack(hash_val, m_val, settings)
 
-    def restore_crack(self, session_name: str) -> dict:
+    def restore_crack(self, restore_file_path: str) -> dict:
         if self._window:
             self._window.evaluate_js("clearHashcatOutput()")
-        return self.run_restore(session_name)
+        return self.run_restore(restore_file_path)
 
     def is_running(self) -> dict:
         return _ok(self._crack_manager.is_running)
@@ -225,9 +245,6 @@ class Api(ConfigMixin, DownloadMixin, CrackMixin):
         if not self._window:
             return _ok({"maximized": False})
 
-        if not hasattr(self, '_is_maximized'):
-            self._is_maximized = False
-
         if self._is_maximized:
             self._window.restore()
             self._is_maximized = False
@@ -243,6 +260,9 @@ class Api(ConfigMixin, DownloadMixin, CrackMixin):
         return _ok({"width": 1100, "height": 750})
 
     def resize(self, width: int, height: int) -> dict:
+        # Clamp to sane bounds to prevent zero/negative/astronomical values
+        width = max(400, min(int(width), 4096))
+        height = max(300, min(int(height), 2160))
         if self._window:
             self._window.resize(width, height)
         return _ok()

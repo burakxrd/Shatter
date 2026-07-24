@@ -80,7 +80,7 @@ def _parse_eapol_key(raw_bytes: bytes) -> dict | None:
 def _load_scapy():
     """
     Lazy-load scapy with Npcap/WinPcap disabled.
-    Returns (rdpcap, Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL).
+    Returns (PcapReader, Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL).
     """
     import logging
     logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -94,11 +94,11 @@ def _load_scapy():
     conf.use_dnet = False
     conf.use_npcap = False
 
-    from scapy.utils import rdpcap
+    from scapy.utils import PcapReader
     from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt
     from scapy.layers.eap import EAPOL
 
-    return rdpcap, Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL
+    return PcapReader, Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL
 
 
 def parse_cap_to_hc22000(filepath: str) -> list[str]:
@@ -106,65 +106,71 @@ def parse_cap_to_hc22000(filepath: str) -> list[str]:
     Parse a .cap/.pcap/.pcapng file with scapy, extract WPA/WPA2
     handshakes, and return hash lines in hashcat 22000 format.
     """
-    rdpcap, Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL = _load_scapy()
-
-    packets = rdpcap(filepath)
+    PcapReader, Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL = _load_scapy()
 
     # ── Pass 1: Collect ESSIDs from Beacons / Probe Responses ──
     essid_map: dict[str, str] = {}  # bssid → essid
 
-    for pkt in packets:
-        if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp):
-            dot11 = pkt.getlayer(Dot11)
-            if dot11:
-                bssid = dot11.addr3
-                if bssid:
-                    essid = _get_essid(pkt, Dot11Elt)
-                    if essid:
-                        essid_map[bssid.lower()] = essid
+    with PcapReader(filepath) as pcap:
+        for pkt in pcap:
+            if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp):
+                dot11 = pkt.getlayer(Dot11)
+                if dot11:
+                    bssid = dot11.addr3
+                    if bssid:
+                        essid = _get_essid(pkt, Dot11Elt)
+                        if essid:
+                            essid_map[bssid.lower()] = essid
 
     # ── Pass 2: Collect EAPOL key messages ──
     eapol_msgs: list[dict] = []
 
-    for i, pkt in enumerate(packets):
-        if not pkt.haslayer(EAPOL):
-            continue
+    with PcapReader(filepath) as pcap:
+        for i, pkt in enumerate(pcap):
+            if not pkt.haslayer(EAPOL):
+                continue
 
-        dot11 = pkt.getlayer(Dot11)
-        if not dot11:
-            continue
+            dot11 = pkt.getlayer(Dot11)
+            if not dot11:
+                continue
 
-        # Determine direction from flags
-        to_ds = dot11.FCfield.to_DS if hasattr(dot11.FCfield, "to_DS") else (dot11.FCfield & 0x1)
-        from_ds = dot11.FCfield.from_DS if hasattr(dot11.FCfield, "from_DS") else (dot11.FCfield & 0x2)
+            # Determine direction from flags
+            to_ds = dot11.FCfield.to_DS if hasattr(dot11.FCfield, "to_DS") else (dot11.FCfield & 0x1)
+            from_ds = dot11.FCfield.from_DS if hasattr(dot11.FCfield, "from_DS") else (dot11.FCfield & 0x2)
 
-        if to_ds and not from_ds:
-            mac_ap = dot11.addr1   # BSSID
-            mac_sta = dot11.addr2  # STA
-        elif from_ds and not to_ds:
-            mac_sta = dot11.addr1  # STA
-            mac_ap = dot11.addr2   # BSSID
-        else:
-            continue
+            mac_ap: str | None = None
+            mac_sta: str | None = None
 
-        if not mac_ap or not mac_sta:
-            continue
+            if to_ds and not from_ds:
+                mac_ap = dot11.addr1   # BSSID
+                mac_sta = dot11.addr2  # STA
+            elif from_ds and not to_ds:
+                mac_ap = dot11.addr2   # BSSID
+                mac_sta = dot11.addr1  # STA
+            else:
+                continue
 
-        # Full EAPOL frame bytes
-        eapol_layer = pkt.getlayer(EAPOL)
-        eapol_raw = bytes(eapol_layer)
+            # Strict validation: Ensure they exist, are strings, and look like standard MAC addresses (17 chars)
+            if not mac_ap or not isinstance(mac_ap, str) or len(mac_ap) != 17:
+                continue
+            if not mac_sta or not isinstance(mac_sta, str) or len(mac_sta) != 17:
+                continue
 
-        # Key descriptor starts after EAPOL header (4 bytes)
-        key_data = eapol_raw[4:] if len(eapol_raw) > 4 else b""
-        parsed = _parse_eapol_key(key_data)
-        if not parsed:
-            continue
+            # Full EAPOL frame bytes
+            eapol_layer = pkt.getlayer(EAPOL)
+            eapol_raw = bytes(eapol_layer)
 
-        parsed["mac_ap"] = mac_ap.lower()
-        parsed["mac_sta"] = mac_sta.lower()
-        parsed["eapol_raw"] = eapol_raw
-        parsed["pkt_index"] = i
-        eapol_msgs.append(parsed)
+            # Key descriptor starts after EAPOL header (4 bytes)
+            key_data = eapol_raw[4:] if len(eapol_raw) > 4 else b""
+            parsed = _parse_eapol_key(key_data)
+            if not parsed:
+                continue
+
+            parsed["mac_ap"] = mac_ap.lower()
+            parsed["mac_sta"] = mac_sta.lower()
+            parsed["eapol_raw"] = eapol_raw
+            parsed["pkt_index"] = i
+            eapol_msgs.append(parsed)
 
     # ── Pass 3: Match handshake pairs and build hc22000 lines ──
     results: list[str] = []

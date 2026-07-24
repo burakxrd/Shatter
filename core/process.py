@@ -1,14 +1,18 @@
-import ctypes
 import logging
+import os
 import signal
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 import psutil
 
 log = logging.getLogger(__name__)
+
+_TRACKED_NAMES = {"hashcat", "hashcat.exe", "john", "john.exe"}
+_PSUTIL_CACHE_TTL = 1.0  # seconds
 
 class ManagedProcess:
     """
@@ -19,6 +23,8 @@ class ManagedProcess:
         self._active_proc: subprocess.Popen | None = None
         self._paused: bool = False
         self._proc_lock = threading.Lock()
+        self._psutil_cache_ts: float = 0.0
+        self._psutil_cache_result: bool = False
 
     def stream_process(
         self,
@@ -32,6 +38,19 @@ class ManagedProcess:
     ) -> int:
         """Run a subprocess and stream its stdout line-by-line."""
         try:
+            # On Windows: hide the console window via STARTUPINFO instead of
+            # CREATE_NO_WINDOW.  CREATE_NO_WINDOW detaches the process from any
+            # console, which prevents hashcat's SetConsoleCtrlHandler from
+            # receiving CTRL_BREAK_EVENT (used for graceful checkpoint quit).
+            # SW_HIDE keeps the console alive (so the handler works) while
+            # still not showing a visible window to the user.
+            kwargs: dict = {}
+            if sys.platform == "win32":
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 0  # SW_HIDE
+                kwargs["startupinfo"] = si
+
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(cwd),
@@ -40,7 +59,8 @@ class ManagedProcess:
                 text=True,
                 bufsize=1,
                 errors="replace",
-                creationflags=creation_flags | (subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0),
+                creationflags=creation_flags,
+                **kwargs,
             )
 
             if store_proc:
@@ -70,11 +90,20 @@ class ManagedProcess:
                 with self._proc_lock:
                     self._active_proc = None
                     self._paused = False
-            on_done()
+            try:
+                on_done()
+            except Exception as e:
+                log.error("on_done callback raised an exception: %s", e)
 
     @staticmethod
     def run_quiet(cmd: list[str], cwd: str | Path, timeout: int = 15) -> subprocess.CompletedProcess:
         """Run a subprocess quietly and return the result. No streaming."""
+        kwargs: dict = {}
+        if sys.platform == "win32":
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0  # SW_HIDE
+            kwargs["startupinfo"] = si
         return subprocess.run(
             cmd,
             cwd=str(cwd),
@@ -82,7 +111,7 @@ class ManagedProcess:
             text=True,
             timeout=timeout,
             errors="replace",
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            **kwargs,
         )
 
     def stop(self) -> None:
@@ -139,7 +168,10 @@ class ManagedProcess:
                 psutil.Process(proc.pid).resume()
                 self._paused = False
             if sys.platform == "win32":
-                ctypes.windll.kernel32.GenerateConsoleCtrlEvent(1, proc.pid)
+                # os.kill with CTRL_BREAK_EVENT works reliably with
+                # CREATE_NEW_PROCESS_GROUP even when CREATE_NO_WINDOW is set,
+                # unlike GenerateConsoleCtrlEvent which needs a console.
+                os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
             else:
                 proc.send_signal(signal.SIGINT)
             log.info("Checkpoint signal sent.")
@@ -152,8 +184,25 @@ class ManagedProcess:
 
     @property
     def is_running(self) -> bool:
-        """Check if a process is currently active."""
-        return self._active_proc is not None and self._active_proc.poll() is None
+        """Check if a process is currently active (own proc OR any system-wide hashcat/john)."""
+        # 1. Own managed process — cheap check, always first
+        if self._active_proc is not None and self._active_proc.poll() is None:
+            return True
+        # 2. System-wide check — cached to avoid scanning all processes on every poll
+        now = time.monotonic()
+        if now - self._psutil_cache_ts < _PSUTIL_CACHE_TTL:
+            return self._psutil_cache_result
+        result = False
+        try:
+            for proc in psutil.process_iter(["name"]):
+                if proc.info["name"] and proc.info["name"].lower() in _TRACKED_NAMES:
+                    result = True
+                    break
+        except Exception:
+            pass
+        self._psutil_cache_result = result
+        self._psutil_cache_ts = now
+        return result
 
     @property
     def is_paused(self) -> bool:

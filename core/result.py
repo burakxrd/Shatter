@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ParseResult:
-    """Parser fonksiyonlarının standart dönüş tipi."""
+    """Standard return type for parser functions."""
     data: str = ""
     error: str | None = None
     engine: str = ""

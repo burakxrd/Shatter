@@ -40,6 +40,8 @@ def parse_hc_line(line: str) -> dict | None:
         return {"type": "separator"}
     if s.startswith("[!"):
         return {"type": "error", "data": {"message": s[3:].strip()}}
+    if s.startswith("ERROR:"):
+        return {"type": "error", "data": {"message": s[6:].strip()}}
     if s.startswith("[+]"):
         return {"type": "success", "data": {"message": s[3:].strip()}}
     if s.startswith("[*]"):

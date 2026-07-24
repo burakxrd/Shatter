@@ -76,6 +76,8 @@ def validate_hashcat(directory: str | Path) -> Path | None:
         r = subprocess.run(
             [str(exe), "--version"],
             capture_output=True, text=True, timeout=10, cwd=str(d),
+            # CREATE_NO_WINDOW is safe here: this is --version only, no CTRL_BREAK needed.
+            # (stream_process uses SW_HIDE instead for actual cracking sessions.)
             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
         if r.returncode == 0 and r.stdout.strip():

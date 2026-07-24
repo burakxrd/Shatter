@@ -48,7 +48,6 @@ Thumbs.db
 
 # Ignored Folders
 graphify-out/
-mini_structure/
 .github/
 tests/
 docs/

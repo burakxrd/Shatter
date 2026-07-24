@@ -128,12 +128,12 @@ _HASHCAT_FALLBACKS: list[tuple[re.Pattern, str]] = [
 
 
 def extract_all_m_values(detection_str: str) -> list[str]:
-    """Tüm olası m= değerlerini döndürür."""
+    """Returns all possible m= values."""
     return re.findall(r'm=(\d+)', detection_str)
 
 
 def extract_m_value(detection_str: str) -> str | None:
-    """Geriye uyumlu: İlk m= değerini döndürür."""
+    """Backwards compatible: Returns the first m= value."""
     values = extract_all_m_values(detection_str)
     return values[0] if values else None
 
@@ -175,7 +175,9 @@ def detect_hash_type(hash_value: str) -> str:
             from name_that_hash import runner
             api_result = runner.api_return_hashes_as_dict([h])
             nth_matches = api_result.get(h, [])
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug("NTH detection failed: %s", e)
             nth_matches = []
 
         # Filter: only keep results with a valid Hashcat mode

@@ -25,8 +25,9 @@ class TerminalManager {
         this.MAX_TRACKED = 10000;
 
         // Callback'ler — dışarıdan enjekte edilir
-        this._onProgress = options.onProgress || (() => {});
-        this._onExtractDone = options.onExtractDone || (() => {});
+        this._onProgress = options.onProgress || (() => { });
+        this._onExtractDone = options.onExtractDone || (() => { });
+        this._onStatusDone = options.onStatusDone || (() => { });
 
         this._events.addEventListener('scroll', () => {
             const atBottom =
@@ -83,6 +84,15 @@ class TerminalManager {
                     const icon = d.status === 'Cracked' ? '✅' : d.status === 'Exhausted' ? '❌' : 'ℹ️';
                     const cls = d.status === 'Cracked' ? 'success' : d.status === 'Exhausted' ? 'error' : 'info';
                     this._addEventCard(icon, `Status: ${d.status}`, cls);
+
+                    // Terminal statuses that indicate the engine has finished.
+                    // NOTE: Do NOT include 'Cracked' here — the hash_cracked event
+                    // (which populates _crackedPasswords) is emitted AFTER the
+                    // Cracked status line but BEFORE Stopped. Triggering onCrackDone
+                    // on Cracked would fire the reveal before the password is known.
+                    if (d.status === 'Stopped' || d.status === 'Exhausted') {
+                        this._onStatusDone(d.status);
+                    }
                 }
                 break;
 
@@ -274,11 +284,11 @@ class TerminalManager {
         });
         this._lastStatus = null;
         this._userScrolledUp = false;
-        
+
         if (resetState) {
             this._crackedPasswords.clear();
         }
-        
+
         this._onProgress(0);
         document.getElementById('progress-text').children[1].innerText = 'ETA: --:--:--';
     }
@@ -344,11 +354,13 @@ class HashcatBridge {
     restoreCrack(session) { return this._call('restore_crack', session); }
     stopCrack() { return this._call('stop_crack'); }
     pauseCrack() { return this._call('pause_crack'); }
+    resumeCrack() { return this._call('resume_crack'); }
     checkpointCrack() { return this._call('checkpoint_crack'); }
     isRunning() { return this._call('is_running'); }
     getDevices() { return this._call('get_devices'); }
     runBenchmark(deviceId) { return this._call('run_benchmark', deviceId); }
     browseFolder() { return this._call('browse_folder'); }
+    browseRestoreFile() { return this._call('browse_restore_file'); }
     getConfig() { return this._call('get_config'); }
     saveConfig(cfg) { return this._call('save_config', cfg); }
     setToolPaths(hc, jtr) { return this._call('set_tool_paths', hc, jtr); }
@@ -394,6 +406,7 @@ class SettingsStore {
             session_name: document.getElementById('set-session').value.trim(),
             hwmon_temp_abort: document.getElementById('set-temp').value.trim(),
             disable_potfile: document.getElementById('set-disable-potfile').checked,
+            disable_self_test: document.getElementById('set-disable-self-test').checked,
             skip: document.getElementById('set-skip').value.trim(),
             limit: document.getElementById('set-limit').value.trim(),
         };
@@ -443,6 +456,7 @@ class SettingsStore {
         if (cfg.session_name) document.getElementById('set-session').value = cfg.session_name;
         if (cfg.hwmon_temp_abort) document.getElementById('set-temp').value = cfg.hwmon_temp_abort;
         if (cfg.disable_potfile) document.getElementById('set-disable-potfile').checked = cfg.disable_potfile;
+        if (cfg.disable_self_test) document.getElementById('set-disable-self-test').checked = cfg.disable_self_test;
         if (cfg.skip) document.getElementById('set-skip').value = cfg.skip;
         if (cfg.limit) document.getElementById('set-limit').value = cfg.limit;
 
@@ -501,6 +515,11 @@ const terminal = new TerminalManager(
             } else if (d.hash) {
                 document.getElementById('hash-input').value = d.hash;
                 document.getElementById('hash-input').dispatchEvent(new Event('input'));
+            }
+        },
+        onStatusDone: (status) => {
+            if (isCracking) {
+                window.onCrackDone();
             }
         }
     }
@@ -746,40 +765,54 @@ function setButtonLoading(btn, isLoading) {
 
 // ── Dashboard Actions ──
 
-document.getElementById('hash-input').addEventListener('input', async (e) => {
+let _hashDetectTimer = null;
+let _lastManualWarningShown = false;
+
+document.getElementById('hash-input').addEventListener('input', (e) => {
     const val = e.target.value.trim();
     if (!val) {
         document.getElementById('algo-name').innerText = 'None';
-        document.getElementById('algo-name').className = 'text-white';
+        document.getElementById('algo-name').classList.remove('text-danger', 'text-accent');
+        document.getElementById('algo-name').classList.add('text-white');
+        if (_hashDetectTimer) clearTimeout(_hashDetectTimer);
+        _lastManualWarningShown = false;
         return;
     }
-    const res = await bridge.detectHash(val);
-    if (!res) return;
-    
-    if (res.needs_manual_selection) {
-        document.getElementById('algo-name').innerText = 'Unknown - Manual Selection Required';
-        document.getElementById('algo-name').className = 'text-danger';
-        document.getElementById('hash-mode').value = '';
-        showToast('Hash type could not be detected. Please select or enter the mode manually.', 'warning');
-    } else {
-        document.getElementById('algo-name').innerText = res.algo;
-        if (res.algo.includes('Unknown') || res.algo.includes('Failed')) {
-            document.getElementById('algo-name').className = 'text-danger';
-        } else {
-            document.getElementById('algo-name').className = 'text-accent';
-        }
-        document.getElementById('hash-mode').value = res.m_value || '0';
-    }
 
-    store.hashFilePath = null;
-    document.getElementById('hashfile-label').classList.add('hidden');
-    store.save();
+    if (_hashDetectTimer) clearTimeout(_hashDetectTimer);
+    _hashDetectTimer = setTimeout(async () => {
+        const res = await bridge.detectHash(val);
+        if (!res) return;
+
+        if (res.needs_manual_selection) {
+            document.getElementById('algo-name').innerText = 'Unknown - Manual Selection Required';
+            document.getElementById('algo-name').className = 'text- font-mono font-semibold text-xs ml-1';
+            document.getElementById('hash-mode').value = '';
+            if (!_lastManualWarningShown) {
+                showToast('Hash type could not be detected. Please select or enter the mode manually.', 'warning');
+                _lastManualWarningShown = true;
+            }
+        } else {
+            document.getElementById('algo-name').innerText = res.algo;
+            if (res.algo.includes('Unknown') || res.algo.includes('Failed')) {
+                document.getElementById('algo-name').className = 'text- font-mono font-semibold text-xs ml-1';
+            } else {
+                document.getElementById('algo-name').className = 'text- font-mono font-semibold text-xs ml-1';
+            }
+            document.getElementById('hash-mode').value = res.m_value || '0';
+            _lastManualWarningShown = false;
+        }
+
+        store.hashFilePath = null;
+        document.getElementById('hashfile-label').classList.add('hidden');
+        store.save();
+    }, 300);
 });
 
 function clearHash() {
     document.getElementById('hash-input').value = '';
     document.getElementById('algo-name').innerText = 'None';
-    document.getElementById('algo-name').className = 'text-white';
+    document.getElementById('algo-name').className = 'text- font-mono font-semibold text-xs ml-1';
     document.getElementById('hash-mode').value = '0';
     store.hashFilePath = null;
     document.getElementById('hashfile-label').classList.add('hidden');
@@ -809,7 +842,7 @@ async function loadHashFile() {
         lbl.innerText = `📋 Loaded File: ${name}`;
         lbl.classList.remove('hidden');
         document.getElementById('algo-name').innerText = 'File provided (manual mode needed)';
-        document.getElementById('algo-name').className = 'text-textDim';
+        document.getElementById('algo-name').className = 'text- font-mono font-semibold text-xs ml-1';
         store.save();
     }
 }
@@ -871,12 +904,25 @@ document.getElementById('set-attack-mode').addEventListener('change', (e) => {
 function dismissReveal() {
     document.getElementById('cracked-reveal').classList.add('hidden');
     document.getElementById('btn-crack').style.display = 'flex';
+    document.getElementById('btn-restore').style.display = 'flex';
 }
 
 window.onCrackDone = async function () {
     isCracking = false;
     setFormLocked(false);
     document.getElementById('process-controls').style.display = 'none';
+
+    // Check if we captured any cracked passwords during this session directly from the terminal
+    if (terminal._crackedPasswords && terminal._crackedPasswords.size > 0) {
+        const pwArray = Array.from(terminal._crackedPasswords);
+        const lastPw = pwArray[pwArray.length - 1];
+        
+        document.getElementById('cracked-password-display').innerText = lastPw;
+        document.getElementById('btn-crack').style.display = 'none';
+        document.getElementById('btn-restore').style.display = 'none';
+        document.getElementById('cracked-reveal').classList.remove('hidden');
+        return;
+    }
 
     // Check potfile for the big reveal!
     const targetHash = document.getElementById('hash-input').value.trim();
@@ -897,10 +943,16 @@ window.onCrackDone = async function () {
     }
 
     document.getElementById('btn-crack').style.display = 'flex';
-    document.getElementById('btn-restore').style.display = 'none';
+    document.getElementById('btn-restore').style.display = 'flex';
 };
 
 // ── Execution ──
+
+function resetPauseButton() {
+    const btn = document.getElementById('btn-pause');
+    btn.innerText = 'Pause';
+    btn.classList.remove('bg-accent/20', 'text-accent', 'border-accent/50');
+}
 
 async function startCrack() {
     if (!store.hcPath) {
@@ -917,12 +969,10 @@ async function startCrack() {
     isCracking = true;
     setFormLocked(true);
     document.getElementById('btn-crack').style.display = 'none';
+    document.getElementById('btn-restore').style.display = 'none';
     document.getElementById('process-controls').style.display = 'flex';
+    resetPauseButton();
     terminal.open();
-
-    if (settings.session_name) {
-        document.getElementById('btn-restore').style.display = 'flex';
-    }
 
     const res = await bridge.startCrack(settings);
     if (!res) {
@@ -932,18 +982,22 @@ async function startCrack() {
 }
 
 async function restoreCrack() {
-    const session = document.getElementById('set-session').value.trim();
-    if (!session) {
-        showToast('Please set a Session Name in settings to restore.', 'warning');
-        return;
-    }
+    // Open a file dialog so the user can pick the .restore file they want to resume
+    const fileRes = await bridge.browseRestoreFile();
+    if (!fileRes || fileRes.cancelled) return;  // user cancelled
+
+    const restorePath = fileRes.path;
+    if (!restorePath) return;
+
     isCracking = true;
     setFormLocked(true);
     document.getElementById('btn-crack').style.display = 'none';
+    document.getElementById('btn-restore').style.display = 'none';
     document.getElementById('process-controls').style.display = 'flex';
+    resetPauseButton();
     terminal.open();
 
-    const res = await bridge.restoreCrack(session);
+    const res = await bridge.restoreCrack(restorePath);
     if (!res) {
         window.onCrackDone();
         return;
@@ -963,7 +1017,7 @@ async function stopCrack() {
 
     const watchdog = setInterval(async () => {
         waited += POLL_INTERVAL;
-        
+
         try {
             const status = await bridge.isRunning();
             if (!status) {
@@ -971,7 +1025,7 @@ async function stopCrack() {
                 if (isCracking) window.onCrackDone();
                 return;
             }
-        } catch (e) {}
+        } catch (e) { }
 
         if (waited >= MAX_WAIT) {
             clearInterval(watchdog);
@@ -983,13 +1037,19 @@ async function stopCrack() {
 
 async function pauseCrack() {
     const btn = document.getElementById('btn-pause');
-    const res = await bridge.pauseCrack();
-    if (res && res.paused) {
-        btn.innerText = 'Resume';
-        btn.classList.add('bg-accent/20', 'text-accent', 'border-accent/50');
+    const isPaused = btn.innerText.trim() === 'Resume';
+    if (isPaused) {
+        const res = await bridge.resumeCrack();
+        if (res && res.resumed) {
+            btn.innerText = 'Pause';
+            btn.classList.remove('bg-accent/20', 'text-accent', 'border-accent/50');
+        }
     } else {
-        btn.innerText = 'Pause';
-        btn.classList.remove('bg-accent/20', 'text-accent', 'border-accent/50');
+        const res = await bridge.pauseCrack();
+        if (res && res.paused) {
+            btn.innerText = 'Resume';
+            btn.classList.add('bg-accent/20', 'text-accent', 'border-accent/50');
+        }
     }
 }
 
@@ -1148,16 +1208,20 @@ window.addEventListener('pywebviewready', async function () {
 
         // Trigger mode UI update
         document.getElementById('set-attack-mode').dispatchEvent(new Event('change'));
-        // Trigger hash detect UI update
+        // Trigger hash detect UI update (for the algorithm label only)
         if (cfg.hash && !cfg.hash_file_path) {
+            const savedMode = cfg.m_value || document.getElementById('hash-mode').value;
             document.getElementById('hash-input').dispatchEvent(new Event('input'));
+            // Restore the saved mode after detection overwrites it
+            // (detection runs on a 300ms timer, so we restore after it)
+            setTimeout(() => {
+                if (savedMode) {
+                    document.getElementById('hash-mode').value = savedMode;
+                }
+            }, 400);
         }
 
         if (store.hcPath) loadDevices();
-
-        if (cfg.session_name) {
-            document.getElementById('btn-restore').style.display = 'flex';
-        }
     }
 
     store.attachAutoSave();

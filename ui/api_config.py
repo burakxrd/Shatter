@@ -10,16 +10,10 @@ log = logging.getLogger(__name__)
 
 CONFIG_FILE = TEMP_DIR / "config.json"
 
-def _ok(data=None):
-    if data is None:
-        data = {}
-    return {"success": True, "data": data, "error": None}
-
-def _err(msg):
-    return {"success": False, "data": None, "error": msg}
+from ui.envelope import _ok, _err
 
 class ConfigMixin:
-    """Konfigürasyon ve dizin yönetimi mixin'i."""
+    """Configuration and directory management mixin."""
 
     def get_config(self) -> dict:
         if CONFIG_FILE.exists():
@@ -55,8 +49,16 @@ class ConfigMixin:
     def set_tool_paths(self, hc_path: str, jtr_path: str) -> dict:
         if hc_path:
             if not tool_paths.set_hashcat_dir(hc_path):
+                # Validation failed (exe not found or not runnable) but apply anyway
+                # so the user can point to a directory before downloading hashcat.
                 tool_paths.hashcat_dir = Path(hc_path)
                 tool_paths.hashcat_exe = Path(hc_path) / "hashcat.exe"
+                log.warning("Hashcat path set but validation failed: %s", hc_path)
+                if hasattr(self, "_emit_event"):
+                    self._emit_event({
+                        "type": "warning",
+                        "data": {"message": f"Hashcat not found or not runnable at: {hc_path}"}
+                    })
         else:
             tool_paths.hashcat_dir = None
             tool_paths.hashcat_exe = None
@@ -64,6 +66,12 @@ class ConfigMixin:
         if jtr_path:
             if not tool_paths.set_jtr_dir(jtr_path):
                 tool_paths.jtr_dir = Path(jtr_path)
+                log.warning("JtR path set but validation failed: %s", jtr_path)
+                if hasattr(self, "_emit_event"):
+                    self._emit_event({
+                        "type": "warning",
+                        "data": {"message": f"John the Ripper not found at: {jtr_path}"}
+                    })
         else:
             tool_paths.jtr_dir = None
 

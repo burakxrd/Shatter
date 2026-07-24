@@ -1,4 +1,4 @@
-"""Hashcat ve JtR potfile dosyalarını okuyup parse eden modül."""
+"""Module for reading and parsing Hashcat and JtR potfiles."""
 
 import logging
 from pathlib import Path
@@ -7,9 +7,9 @@ log = logging.getLogger(__name__)
 
 
 def parse_hashcat_potfile(pot_path: Path) -> list[dict]:
-    """Hashcat potfile'ı okur. Her satırdaki hataları izole eder.
+    """Reads Hashcat potfile. Isolates errors on each line.
     
-    Hashcat potfile formatı: HASH:PLAINTEXT
+    Hashcat potfile format: HASH:PLAINTEXT
     """
     entries = []
     if not pot_path or not pot_path.exists():
@@ -34,10 +34,10 @@ def parse_hashcat_potfile(pot_path: Path) -> list[dict]:
 
 
 def parse_jtr_potfile(pot_path: Path) -> list[dict]:
-    """JtR potfile'ı okur. Formatı Hashcat'ten farklıdır.
+    """Reads JtR potfile. Format differs from Hashcat.
     
-    JtR potfile formatı: $FORMAT$HASH:PLAINTEXT
-    Ayrıca $HEX$(...) encode'lu şifreler olabilir.
+    JtR potfile format: $FORMAT$HASH:PLAINTEXT
+    May also contain $HEX$(...) encoded passwords.
     """
     entries = []
     if not pot_path or not pot_path.exists():
@@ -62,17 +62,17 @@ def parse_jtr_potfile(pot_path: Path) -> list[dict]:
 
 
 def _parse_hc_potline(line: str) -> dict | None:
-    """Tek bir Hashcat potfile satırını parse eder.
+    """Parses a single Hashcat potfile line.
     
-    Hashcat formatı genelde: hash:plain
-    $HEX[...] encoding'i desteklenir.
-    rsplit kullanımı: şifre ':' içerebilir AMA hash'in formatı belirli.
-    Hashcat'in kendi mantığı: son ':' ayırıcıdır (rsplit doğru).
+    Hashcat format is usually: hash:plain
+    
+    Using rsplit: password can contain ':' BUT hash format is fixed.
+    Hashcat's logic: the last ':' is the separator (rsplit is correct).
     """
     if ":" not in line:
         return None
 
-    # Hashcat potfile: HASH:PLAIN — son ':' ayırıcıdır
+    # Hashcat potfile: HASH:PLAIN — last ':' is the separator
     h, p = line.rsplit(":", 1)
     if not h:
         return None
@@ -82,11 +82,11 @@ def _parse_hc_potline(line: str) -> dict | None:
 
 
 def _parse_jtr_potline(line: str) -> dict | None:
-    """Tek bir JtR potfile satırını parse eder.
+    """Parses a single JtR potfile line.
     
-    JtR formatı: USER:$FORMAT$HASH:PLAIN veya $FORMAT$HASH:PLAIN
-    İlk ':' genelde hash sonrasıdır ama format karmaşık.
-    JtR'da da son ':' genelde password'dür.
+    JtR format: USER:$FORMAT$HASH:PLAIN or $FORMAT$HASH:PLAIN
+    The first ':' is usually after the hash, but the format is complex.
+    In JtR, the last ':' is also usually the password.
     """
     if ":" not in line:
         return None
@@ -100,11 +100,11 @@ def _parse_jtr_potline(line: str) -> dict | None:
 
 
 def _decode_hex_password(pwd: str) -> str:
-    """$HEX[...] formatındaki şifreleri decode eder."""
+    """Decodes passwords in $HEX[...] format."""
     pwd = pwd.strip()
     if pwd.startswith("$HEX[") and pwd.endswith("]"):
         try:
             return bytes.fromhex(pwd[5:-1]).decode("utf-8", errors="replace")
         except ValueError:
-            return pwd  # Decode başarısızsa ham string döndür
+            return pwd  # Return raw string if decoding fails
     return pwd

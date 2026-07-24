@@ -19,12 +19,16 @@ class JtrEngine(BaseEngine):
 
     def __init__(self, jtr_dir: Path | None = None) -> None:
         self.jtr_dir = jtr_dir
+        self.jtr_exe: Path | None = None
         self.process = ManagedProcess()
 
     def _get_jtr_exe(self) -> Path:
+        if self.jtr_exe and self.jtr_exe.is_file():
+            return self.jtr_exe
         if self.jtr_dir:
-            exe = self.jtr_dir / "john.exe"
-            if exe.exists():
+            exe_name = "john.exe" if sys.platform == "win32" else "john"
+            exe = self.jtr_dir / exe_name
+            if exe.is_file():
                 return exe
         raise FileNotFoundError("John the Ripper not configured. Go to General → Tool Paths.")
 
@@ -77,7 +81,7 @@ class JtrEngine(BaseEngine):
         cmd = [str(self._get_jtr_exe())]
         
         if jtr_format:
-            # Sadece alfanumerik ve tire/altçizgi
+            # Only alphanumeric, hyphen and underscore
             import re
             if re.match(r'^[a-zA-Z0-9_\-]+$', jtr_format):
                 cmd.append(f"--format={jtr_format}")

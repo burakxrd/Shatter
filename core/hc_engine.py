@@ -11,6 +11,8 @@ from core.process import ManagedProcess
 log = logging.getLogger(__name__)
 
 TARGET_HASH_FILE = TEMP_DIR / "target_hash.txt"
+SESSIONS_DIR = TEMP_DIR / "sessions"
+SESSIONS_DIR.mkdir(exist_ok=True)
 
 from core.engine_base import BaseEngine
 
@@ -21,6 +23,8 @@ class HashcatEngine(BaseEngine):
         self.hashcat_exe = hashcat_exe
         self.hashcat_dir = hashcat_dir
         self.process = ManagedProcess()
+        self._last_session: str | None = None
+        self._last_restore_file: Path | None = None
 
     def _get_hashcat_exe(self) -> Path:
         if self.hashcat_exe:
@@ -92,7 +96,44 @@ class HashcatEngine(BaseEngine):
         if session:
             valid, err = validate_cli_arg("session_name", session)
             if valid:
+                DEFAULT_SESSION = "shatter"
+
+                # Always wipe ALL existing restore files for this session name from
+                # SESSIONS_DIR and the hashcat CWD so hashcat doesn't see a stale
+                # session and exit with code 4294967295 ("Session already exists").
+                for existing in SESSIONS_DIR.glob(f"{session}*.restore"):
+                    try:
+                        existing.unlink()
+                    except Exception:
+                        pass
+                old_cwd_restore = self._get_hashcat_cwd() / f"{session}.restore"
+                if old_cwd_restore.exists():
+                    try:
+                        old_cwd_restore.unlink()
+                    except Exception:
+                        pass
+
+                # Now pick the save path.
+                # For the default name ("shatter") keep a numbered history so previous
+                # sessions aren't lost — the NEW file will be written by hashcat during
+                # this run and we use the first free slot (shatter.restore,
+                # shatter1.restore, …) as the target path.
+                if session == DEFAULT_SESSION:
+                    restore_file = SESSIONS_DIR / f"{session}.restore"
+                    counter = 1
+                    # After the glob-delete above the dir should be clean; this guard
+                    # is a safety net in case something else created a file in between.
+                    while restore_file.exists():
+                        restore_file = SESSIONS_DIR / f"{session}{counter}.restore"
+                        counter += 1
+                else:
+                    restore_file = SESSIONS_DIR / f"{session}.restore"
+
                 cmd += ["--session", session]
+                cmd += ["--restore-file-path", str(restore_file)]
+                # Track for checkpoint/UI feedback
+                self._last_session = session
+                self._last_restore_file = restore_file
             else:
                 log.warning("Invalid session_name rejected: %s", err)
 
@@ -106,6 +147,8 @@ class HashcatEngine(BaseEngine):
 
         if settings.get("disable_potfile"):
             cmd.append("--potfile-disable")
+        if settings.get("disable_self_test"):
+            cmd.append("--self-test-disable")
         if settings.get("skip"):
             cmd += ["-s", settings["skip"]]
         if settings.get("limit"):
@@ -147,6 +190,54 @@ class HashcatEngine(BaseEngine):
 
         return cmd
 
+    # ------------------------------------------------------------------ #
+    # Internal helpers                                                     #
+    # ------------------------------------------------------------------ #
+
+    def _run_hashcat(
+        self,
+        cmd: list[str],
+        on_output: Callable[[str], None],
+        session_name: str | None = None,
+        restore_file: "Path | None" = None,
+    ) -> int:
+        """Stream a hashcat command, track session info, and return the exit code.
+
+        This is the single place where:
+        - _last_session / _last_restore_file are updated (for checkpoint feedback)
+        - creation_flags are set (CREATE_NEW_PROCESS_GROUP for CTRL_BREAK)
+        - stream_process is called
+        """
+        if session_name:
+            self._last_session = session_name
+        if restore_file:
+            self._last_restore_file = restore_file
+
+        cflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+        return self.process.stream_process(
+            cmd,
+            cwd=self._get_hashcat_cwd(),
+            on_output=on_output,
+            on_done=lambda: None,
+            creation_flags=cflags,
+            store_proc=True,
+        )
+
+    @staticmethod
+    def _hashcat_exit_message(rc: int) -> str | None:
+        """Return a human-readable summary for a hashcat exit code, or None for rc==0."""
+        if rc == 1:
+            return "\n    \u274c  EXHAUSTED \u2014 Password not found in wordlist/mask.\n\n"
+        if rc == 2:
+            return "[*] Hashcat aborted (checkpoint or quit).\n"
+        if rc == 0:
+            return None  # handled by the caller (cracked / finished)
+        return f"[*] Hashcat exited with code {rc}.\n"
+
+    # ------------------------------------------------------------------ #
+    # Public API                                                           #
+    # ------------------------------------------------------------------ #
+
     def run_crack(
         self,
         hash_value: str,
@@ -167,33 +258,48 @@ class HashcatEngine(BaseEngine):
         if not settings.get("disable_potfile") and not hash_file_path:
             existing_pw = self._hashcat_show(m_value)
             if existing_pw:
-                on_output("─" * 60 + "\n")
-                on_output(f"[+] Password already cracked (from potfile)!\n\n")
-                on_output(f"    ✅  PASSWORD:  {existing_pw}\n\n")
-                on_output("─" * 60 + "\n")
+                on_output("\u2500" * 60 + "\n")
+                on_output("[+] Password already cracked (from potfile)!\n\n")
+                on_output(f"    \u2705  PASSWORD:  {existing_pw}\n\n")
+                on_output("\u2500" * 60 + "\n")
                 on_output("[*] Use 'Disable Potfile' in Advanced tab to re-crack.\n")
                 on_done()
                 return
 
         cmd = self._build_hashcat_cmd(m_value, settings)
-        on_output("─" * 60 + "\n")
-        cflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+        on_output("\u2500" * 60 + "\n")
 
-        rc = self.process.stream_process(
-            cmd, cwd=self._get_hashcat_cwd(), on_output=on_output, on_done=lambda: None,
-            creation_flags=cflags, store_proc=True,
+        # Capture cracked password from stdout (HASH:PASSWORD line).
+        # Works whether potfile is enabled or not.
+        _captured_pw: str | None = None
+
+        def _capturing_output(line: str) -> None:
+            nonlocal _captured_pw
+            on_output(line)
+            if _captured_pw is not None:
+                return
+            stripped = line.strip()
+            if not stripped or stripped.startswith(("[", "*", "#", "-", "=")):
+                return
+            target = hash_value.strip() if not hash_file_path else None
+            if target and stripped.startswith(target) and ":" in stripped[len(target):]:
+                _captured_pw = stripped[len(target) + 1:]
+
+        # Pull session info from the command we just built
+        session_name = self._last_session
+        restore_file = self._last_restore_file
+        rc = self._run_hashcat(cmd, _capturing_output, session_name, restore_file)
+
+        on_output(f"\n{'\u2500' * 60}\n")
+        cracked_pw = _captured_pw or (
+            self._hashcat_show(m_value) if not settings.get("disable_potfile") else None
         )
-
-        on_output(f"\n{'─' * 60}\n")
-        cracked_pw = self._hashcat_show(m_value)
         if cracked_pw:
-            on_output(f"\n    ✅  PASSWORD FOUND:  {cracked_pw}\n\n")
-        elif rc == 1:
-            on_output(f"\n    ❌  EXHAUSTED — Password not found in wordlist/mask.\n\n")
-        elif rc == 0:
-            on_output("[+] Hashcat finished successfully.\n")
+            on_output(f"\n    \u2705  PASSWORD FOUND:  {cracked_pw}\n\n")
+        elif msg := self._hashcat_exit_message(rc):
+            on_output(msg)
         else:
-            on_output(f"[*] Hashcat exited with code {rc}.\n")
+            on_output("[+] Hashcat finished successfully.\n")
 
         on_done()
 
@@ -223,7 +329,7 @@ class HashcatEngine(BaseEngine):
         return devices
 
     def run_benchmark(self, device_id: str, on_output: Callable[[str], None], on_done: Callable[[], None]) -> None:
-        cmd = [str(self._get_hashcat_exe()), "-b", "-m", "0", "-m", "1000", "-d", device_id]
+        cmd = [str(self._get_hashcat_exe()), "-b", "-d", device_id]
         on_output(f"[*] Benchmarking Device ID: {device_id}\n")
         on_output("─" * 60 + "\n")
         
@@ -236,7 +342,13 @@ class HashcatEngine(BaseEngine):
             on_output(f"[*] Benchmark exited with code {rc}.\n")
         on_done()
 
-    def run_restore(self, session_name: str, on_output: Callable[[str], None], on_done: Callable[[], None]) -> None:
+    def run_restore(
+        self,
+        session_name: str,
+        restore_file_path: str,
+        on_output: Callable[[str], None],
+        on_done: Callable[[], None],
+    ) -> None:
         from core.sanitizer import validate_cli_arg
         valid, err = validate_cli_arg("session_name", session_name)
         if not valid:
@@ -244,24 +356,24 @@ class HashcatEngine(BaseEngine):
             on_done()
             return
 
-        cmd = [str(self._get_hashcat_exe()), "--session", session_name, "--restore",
-               "--status", "--status-timer=2"]
+        cmd = [
+            str(self._get_hashcat_exe()),
+            "--session", session_name,
+            "--restore",
+            "--restore-file-path", restore_file_path,
+            "--status", "--status-timer=2",
+        ]
 
         on_output(f"[*] Restoring session: {session_name}\n")
-        on_output("─" * 60 + "\n")
-        cflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+        on_output(f"[*] Restore file: {restore_file_path}\n")
+        on_output("\u2500" * 60 + "\n")
 
-        rc = self.process.stream_process(
-            cmd, cwd=self._get_hashcat_cwd(), on_output=on_output, on_done=lambda: None,
-            creation_flags=cflags, store_proc=True,
-        )
+        rc = self._run_hashcat(cmd, on_output, session_name, Path(restore_file_path))
 
-        on_output(f"\n{'─' * 60}\n")
+        on_output(f"\n{'\u2500' * 60}\n")
         if rc == 0:
             on_output("[+] Restored session finished successfully.\n")
-        elif rc == 1:
-            on_output("\n    ❌  EXHAUSTED — Password not found.\n\n")
-        else:
-            on_output(f"[*] Hashcat exited with code {rc}.\n")
+        elif msg := self._hashcat_exit_message(rc):
+            on_output(msg)
 
         on_done()

@@ -6,6 +6,7 @@ _NOISE_PATTERNS = [
     re.compile(r'^Warning:', re.IGNORECASE),
     re.compile(r'^Press .+ to ', re.IGNORECASE),
     re.compile(r'^Proceeding with', re.IGNORECASE),
+    re.compile(r'^John the Ripper', re.IGNORECASE), # Fix for banner False Positives
 ]
 
 _RE_JTR_CRACKED = re.compile(r'^(?:[^:]+:\s*)?(.*?)\s+\(([^)]{1,64})\)$')
@@ -52,6 +53,8 @@ def parse_jtr_line(line: str) -> dict | None:
             # Reject if the 'password' part looks like a JtR status/banner line
             if " DONE " in pwd or pwd.startswith("Warning:") or pwd.startswith("Cost "):
                 pass
+            elif pwd.lower().startswith("john the ripper") or pwd.lower().startswith("linux") or pwd.lower().startswith("macos"):
+                pass # Extra safety net for banners like "John the Ripper 1.9.0-jumbo-1 (Windows)"
             else:
                 user_or_hash = m.group(2).strip() if m.lastindex and m.lastindex >= 2 else "N/A"
                 return {"type": "hash_cracked", "data": {"hash": user_or_hash, "password": pwd}}

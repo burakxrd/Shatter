@@ -34,8 +34,8 @@ def main() -> None:
             screen = screens[0]
             x = int((screen.width - width) / 2)
             y = int((screen.height - height) / 2)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Could not center window: %s", e)
     
     window = webview.create_window(
         title="Shatter",
@@ -50,7 +50,7 @@ def main() -> None:
         easy_drag=False, # We handle drag via css class
     )
     
-    api._window = window
+    api.set_window(window)
     
     # Start webview loop (blocks until closed)
     webview.start(debug="--debug" in sys.argv)
