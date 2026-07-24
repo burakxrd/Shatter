@@ -18,9 +18,6 @@
 
 ---
 
-<!-- TODO: Add demo GIF/video here -->
-<!-- https://github.com/user-attachments/assets/xxx -->
-
 ## What is Shatter?
 
 Shatter is a desktop hash cracking platform built with **Python + pywebview**, designed for penetration testers and security researchers. It's not just a GUI wrapper — it adds a real intelligence layer on top of CLI tools with automatic hash detection, encrypted file extraction, native PCAP parsing, and smart process management.
@@ -80,7 +77,7 @@ Built-in WPA/WPA2 handshake parser for `.cap`, `.pcap`, and `.pcapng` files — 
 - **Live Progress Bar + ETA:** Parsed from hashcat `--status` output
 
 ### 📋 Potfile Viewer
-- Parses `hashcat.potfile` and displays cracked hash:password pairs in a searchable table
+- Parses `hashcat.potfile` and `john.pot` — displays cracked hash:password pairs from both engines in a searchable table
 - One-click copy to clipboard
 - Potfile clearing with confirmation
 
@@ -97,16 +94,25 @@ Built-in WPA/WPA2 handshake parser for `.cap`, `.pcap`, and `.pcapng` files — 
 Shatter/
 ├── shatter.pyw          # Entry point (pywebview window)
 ├── core/
-│   ├── engine.py        # Hashcat process lifecycle, hash extraction, crack/benchmark/restore
+│   ├── hc_engine.py     # Hashcat command building and execution
+│   ├── jtr_engine.py    # John the Ripper command building and execution
+│   ├── engine_base.py   # Abstract base class for engines
+│   ├── crack_manager.py # Orchestrates between Hashcat and JtR engines
+│   ├── process.py       # Subprocess lifecycle (pause, resume, checkpoint, kill)
 │   ├── detector.py      # Hash type detection (NTH + regex fallback)
 │   ├── cap_parser.py    # Scapy-based .cap → hc22000 converter
+│   ├── potfile_parser.py# Hashcat & JtR potfile parsing
+│   ├── sanitizer.py     # CLI argument validation
 │   ├── tool_paths.py    # Hashcat & JtR auto-discovery and validation
 │   └── log_config.py    # Logging configuration (rotating file + console)
 ├── ui/
 │   ├── api.py           # Python ↔ JS bridge (pywebview js_api)
-│   └── web/             # Frontend (HTML + Tailwind CSS + vanilla JS)
-├── tests/               # pytest test suite
-└── temp/                # Runtime config, hash files, logs
+│   ├── api_crack.py     # Crack / restore / checkpoint mixin
+│   ├── api_config.py    # Config and tool path management mixin
+│   ├── api_download.py  # Hashcat & JtR download mixin
+│   └── web/             # Frontend (HTML + CSS + vanilla JS)
+├── tests/               # pytest test suite (98 tests)
+└── temp/                # Runtime config, hash files, sessions, logs
 ```
 
 **Key design decisions:**
